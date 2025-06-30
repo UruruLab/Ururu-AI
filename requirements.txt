@@ -1,0 +1,5 @@
+fastapi==0.115.14
+pydantic==2.11.7
+pydantic_core==2.33.2
+python-multipart==0.0.20
+uvicorn==0.35.0
