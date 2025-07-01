@@ -34,7 +34,11 @@ def get_memory_usage():
     process = psutil.Process(os.getpid())
     return process.memory_info().rss / 1024 / 1024
 
-@router.get("/models/list")
+@router.get(
+        "/models/list",
+        tags=["모델 테스트"],
+        summary="모델 목록 조회",
+        description="테스트할 모델 목록을 반환합니다.")
 async def get_model_list():
     """테스트할 모델 목록 반환"""
     return {

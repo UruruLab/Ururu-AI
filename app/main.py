@@ -8,7 +8,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
-app.include_router(test_embedding.router, prefix="/api/test", tags=["model-comparison"])
+app.include_router(test_embedding.router, prefix="/api/test")
 
 @app.get("/")
 async def root():
