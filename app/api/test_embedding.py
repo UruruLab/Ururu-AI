@@ -146,3 +146,17 @@ async def load_all_models():
         },
         "results": results
     }
+
+@router.get(
+    "/models/loaded",
+    tags=["모델 테스트"],
+    summary="로딩된 모델 목록",
+    description="현재 로딩된 모델들의 목록과 상태를 반환합니다."
+)
+async def get_loaded_models():
+    """현재 로딩된 모델 목록 반환"""
+    return {
+        "status": "success",
+        "loaded_models": list(loaded_models.keys()),
+        "total_loaded": len(loaded_models)
+    }
