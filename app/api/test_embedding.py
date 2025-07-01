@@ -195,8 +195,6 @@ async def test_model_embeddings():
                 "texts_count": len(test_sentences),
                 "avg_time_per_text": round((end_time - start_time) / len(test_sentences), 4),
                 "embedding_shape": embeddings.shape,
-                "embedding_dimension": model.get_sentence_embedding_dimension(),
-                "device": str(model.device),
                 "memory_usage_mb": round(get_memory_usage(), 2),
                 "success": True
             }
@@ -214,5 +212,27 @@ async def test_model_embeddings():
         "status": "success",
         "test_sentences": test_sentences,
         "results": results
+    }
+
+@router.delete(
+    "/models/clear",
+    tags=["모델 테스트"],
+    summary="모델 캐시 초기화",
+    description="로딩된 모든 모델을 메모리에서 제거하고 캐시를 초기화합니다."
+)
+async def clear_loaded_models():
+    """로딩된 모든 모델 메모리에서 제거"""
+    global loaded_models
+
+    model_count = len(loaded_models)
+    loaded_models.clear()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    
+    return {
+        "status": "success",
+        "message": f"{model_count}개의 로딩된 모델이 메모리에서 제거되었습니다.",
+        "current_memmory_mdb": round(get_memory_usage(), 2)
     }
     
