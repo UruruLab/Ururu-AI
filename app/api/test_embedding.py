@@ -160,3 +160,59 @@ async def get_loaded_models():
         "loaded_models": list(loaded_models.keys()),
         "total_loaded": len(loaded_models)
     }
+
+@router.get(
+    "/models/test-embedding",
+    tags=["모델 테스트"],
+    summary="모델 임베딩 테스트",
+    description="로딩된 모델들에 대해 임베딩 테스트를 수행하고, 결과를 반환합니다."
+)
+async def test_model_embeddings():
+    """로딩된 모든 모델의 임베딩 생성 속도 테스트"""
+    if not loaded_models:
+        raise HTTPException(status_code=404, detail="로딩된 모델이 없습니다. 먼저 모델을 로드하세요.")
+    
+    test_sentences = [
+        "건성 피부용 보습 크림",
+        "민감성 피부 진정 에센스", 
+        "지성 피부 모공 관리 토너",
+        "복합성 피부 밸런싱 세럼",
+        "아토피 피부 저자극 클렌징폼"
+    ]
+
+    results = []
+
+    for model_key, model in loaded_models.items():
+        try:
+            start_time = time.time()
+            embeddings = model.encode(test_sentences)
+            end_time = time.time()
+
+            result = {
+                "model_key": model_key,
+                "model_name": MODELS_TO_TEST[model_key],
+                "embedding_time": round(end_time - start_time, 4),
+                "texts_count": len(test_sentences),
+                "avg_time_per_text": round((end_time - start_time) / len(test_sentences), 4),
+                "embedding_shape": embeddings.shape,
+                "embedding_dimension": model.get_sentence_embedding_dimension(),
+                "device": str(model.device),
+                "memory_usage_mb": round(get_memory_usage(), 2),
+                "success": True
+            }
+        except Exception as e:
+            result = {
+                "model_key": model_key,
+                "model_name": MODELS_TO_TEST[model_key],
+                "error": str(e),
+                "success": False
+            }
+        results.append(result) 
+        print(f"{model_key} : {result.get('embedding_time', 'N/A')}초, 성공: {result.get('success', False)}")
+
+    return {
+        "status": "success",
+        "test_sentences": test_sentences,
+        "results": results
+    }
+    
