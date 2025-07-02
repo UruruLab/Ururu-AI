@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import test_embedding
+from app.api import test_embedding, user
 
 
 app = FastAPI(
@@ -9,6 +9,7 @@ app = FastAPI(
 )
 
 app.include_router(test_embedding.router, prefix="/api/test")
+app.include_router(user.router, prefix="/api/user", tags=["User"])
 
 @app.get("/")
 async def root():
