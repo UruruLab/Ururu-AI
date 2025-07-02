@@ -22,8 +22,8 @@ class UserTowerService:
             text_parts.append(f"알레르기가 있으며, {allergy_text}에 알레르기가 있어 피해야 합니다.")
 
         if profile.interest_categories:
-            catetory_text = ", ".join(profile.interest_categories)
-            text_parts.append(f"{catetory_text} 제품에 관심이 많습니다.")
+            category_text = ", ".join(profile.interest_categories)
+            text_parts.append(f"{category_text} 제품에 관심이 많습니다.")
 
         text_parts.append(f"가격대는 {profile.min_price}원에서 {profile.max_price}원 사이를 선호합니다.")
 
@@ -31,7 +31,6 @@ class UserTowerService:
             text_parts.append(profile.additional_info.strip())
 
         return " ".join(text_parts)
-    
 
     def generate_user_embedding(self, profile: BeautyProfile) -> np.ndarray:
         """뷰티 프로필을 임베딩 벡터로 변환"""
