@@ -35,6 +35,6 @@ class UserTowerService:
     def generate_user_embedding(self, profile: BeautyProfile) -> np.ndarray:
         """뷰티 프로필을 임베딩 벡터로 변환"""
         profile_text = self.profile_to_text(profile)
-        embedding = self.model.encode(profile_text, convert_to_tensor=True)
+        embedding = self.model.encode(profile_text)
         return embedding
         
