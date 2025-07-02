@@ -19,6 +19,7 @@ MODELS_TO_TEST = {
 # 전역 변수로 로딩된 모델들 저장
 loaded_models = {}
 
+
 class ModelComparisonResult(BaseModel):
     model_name: str
     model_key: str
@@ -29,11 +30,13 @@ class ModelComparisonResult(BaseModel):
     device: str = ""
     memory_usage_mb: float = 0.0
 
+
 def get_memory_usage():
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+
 
 def _load_model(model_key: str, model_name: str) -> ModelComparisonResult:
     """모델 로딩을 위한 내부 함수"""
@@ -83,6 +86,7 @@ async def get_model_list():
         "total_models": len(MODELS_TO_TEST)
     }
 
+
 @router.get(
     "/models/load-single/{model_key}",
     tags=["모델 테스트"],
@@ -101,6 +105,7 @@ async def load_single_model(model_key: str):
         "status": "success" if result.load_success else "error",
         "result": result.dict()
     }
+
 
 @router.get(
     "/models/load-all",
@@ -128,6 +133,7 @@ async def load_all_models():
         "results": results
     }
 
+
 @router.get(
     "/models/loaded",
     tags=["모델 테스트"],
@@ -141,6 +147,7 @@ async def get_loaded_models():
         "loaded_models": list(loaded_models.keys()),
         "total_loaded": len(loaded_models)
     }
+
 
 @router.get(
     "/models/test-embedding",
@@ -194,6 +201,7 @@ async def test_model_embeddings():
         "test_sentences": test_sentences,
         "results": results
     }
+
 
 @router.delete(
     "/models/clear",
