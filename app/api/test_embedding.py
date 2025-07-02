@@ -37,7 +37,11 @@ def get_memory_usage():
 
 def _load_model(model_key: str, model_name: str) -> ModelComparisonResult:
     """모델 로딩을 위한 내부 함수"""
-    result = ModelComparisonResult(model_name=model_name, model_key=model_key, load_success=False, load_time=0.0)
+    result = ModelComparisonResult(
+        model_name=model_name, 
+        model_key=model_key, 
+        load_success=False, 
+        load_time=0.0)
 
     try:
         print(f"모델 로딩 시작: {model_name}")
@@ -55,7 +59,7 @@ def _load_model(model_key: str, model_name: str) -> ModelComparisonResult:
         result.load_time = round(end_time - start_time, 2)
         result.embedding_dimension = model.get_sentence_embedding_dimension()
         result.device = str(model.device)
-        result.memory_usage_mb = round(end_memory-start_memory, 2)
+        result.memory_usage_mb = round(end_memory - start_memory, 2)
 
         loaded_models[model_key] = model 
         print(f"{model_name} 모델 로딩 완료")
@@ -115,8 +119,8 @@ async def load_all_models():
     successful_loads = sum(1 for r in results if r['load_success'])
 
     return {
-        "status" : "success",
-        "summary" : {
+        "status": "success",
+        "summary": {
             "total_models": len(MODELS_TO_TEST),
             "successful_loads": successful_loads,
             "failed_loads": len(MODELS_TO_TEST) - successful_loads
@@ -210,6 +214,6 @@ async def clear_loaded_models():
     return {
         "status": "success",
         "message": f"{model_count}개의 로딩된 모델이 메모리에서 제거되었습니다.",
-        "current_memmory_mb": round(get_memory_usage(), 2)
+        "current_memory_mb": round(get_memory_usage(), 2)
     }
     
