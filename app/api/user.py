@@ -22,7 +22,7 @@ async def create_user_embedding(
             "profile": profile.dict(),
             "natural_text": natural_text,
             "embedding_shape": embedding.shape,
-            "embedding_sample": embedding.tolist()  
+            "embedding_sample": embedding[:5].tolist()  
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"임베딩 생성 중 오류 발생: {str(e)}")
