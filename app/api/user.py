@@ -25,4 +25,4 @@ async def create_user_embedding(
             "embedding_sample": embedding[:5].tolist()  
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"임베딩 생성 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"임베딩 생성 중 오류 발생: {str(e)}") from e
