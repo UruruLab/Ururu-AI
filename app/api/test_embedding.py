@@ -35,6 +35,36 @@ def get_memory_usage():
     torch.cuda.empty_cache()
     return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
 
+def _load_model(model_key: str, model_name: str) -> ModelComparisonResult:
+    """모델 로딩을 위한 내부 함수"""
+    result = ModelComparisonResult(model_name=model_name, model_key=model_key, load_success=False, load_time=0.0)
+
+    try:
+        print(f"모델 로딩 시작: {model_name}")
+        start_time = time.time()
+        start_memory = get_memory_usage()
+
+        # 모델 로드
+        model = SentenceTransformer(model_name)
+
+        end_time = time.time()
+        end_memory = get_memory_usage()
+
+        # 결과 저장
+        result.load_success = True
+        result.load_time = round(end_time - start_time, 2)
+        result.embedding_dimension = model.get_sentence_embedding_dimension()
+        result.device = str(model.device)
+        result.memory_usage_mb = round(end_memory-start_memory, 2)
+
+        loaded_models[model_key] = model 
+        print(f"{model_name} 모델 로딩 완료")
+    except Exception as e:
+        result.error_message = str(e)
+        print(f"모델 로딩 실패: {model_name}, 에러: {str(e)}")
+    
+    return result
+
 
 @router.get(
         "/models/list",
@@ -61,31 +91,8 @@ async def load_single_model(model_key: str):
         raise HTTPException(status_code=404, detail="모델을 찾을 수 없습니다.: {model_key}")
     
     model_name = MODELS_TO_TEST[model_key]
-    result = ModelComparisonResult(model_name=model_name, model_key=model_key, load_success=False, load_time=0.0)
+    result = _load_model(model_key, model_name)
 
-    try:
-        print(f"모델 로딩 시작: {model_name}")
-        start_time = time.time()
-        start_memory = get_memory_usage()
-
-        # 모델 로드
-        model = SentenceTransformer(model_name)
-
-        end_time = time.time()
-        end_memory = get_memory_usage()
-
-        # 결과 저장
-        result.load_success = True
-        result.load_time = round(end_time - start_time, 2)
-        result.embedding_dimension = model.get_sentence_embedding_dimension()
-        result.device = str(model.device)
-        result.memory_usage_mb = round(end_memory-start_memory, 2)
-
-        loaded_models[model_key] = model  # 로드된 모델 저장
-        print(f"{model_name} 모델 로딩 완료")
-    except Exception as e:
-        result.error_message = str(e)
-        print(f"모델 로딩 실패: {model_name}, 에러: {str(e)}")
     return {
         "status": "success" if result.load_success else "error",
         "result": result.dict()
@@ -102,39 +109,9 @@ async def load_all_models():
     results = []
 
     for model_key, model_name in MODELS_TO_TEST.items():
-        result = ModelComparisonResult(
-            model_name=model_name,
-            model_key=model_key,
-            load_success=False,
-            load_time=0.0
-        )
-
-        try:
-            print(f"모델 로딩 시작: {model_name}")
-            start_time = time.time()
-            start_memory = get_memory_usage()
-
-            # 모델 로드
-            model = SentenceTransformer(model_name)
-
-            end_time = time.time()
-            end_memory = get_memory_usage()
-
-            # 결과 저장
-            result.load_success = True
-            result.load_time = round(end_time - start_time, 2)
-            result.embedding_dimension = model.get_sentence_embedding_dimension()
-            result.device = str(model.device)
-            result.memory_usage_mb = round(end_memory-start_memory, 2)
-
-            loaded_models[model_key] = model  # 로드된 모델 저장
-            print(f"{model_name} 모델 로딩 완료")
-        except Exception as e:
-            result.error_message = str(e)
-            print(f"모델 로딩 실패: {model_name}, 에러: {str(e)}")
-        
+        result = _load_model(model_key, model_name)
         results.append(result.dict())
-
+    
     successful_loads = sum(1 for r in results if r['load_success'])
 
     return {
