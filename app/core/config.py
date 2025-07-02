@@ -1,6 +1,6 @@
 from pydantic import BaseSettings
 from typing import List
-import os
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -35,12 +35,12 @@ class Settings(BaseSettings):
     ]
     
     # 파일 경로 설정
-    BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    DATA_DIR: str = os.path.join(BASE_DIR, "data")
-    EMBEDDINGS_SAVE_PATH: str = os.path.join(DATA_DIR, "embeddings")
-    FAISS_INDEX_PATH: str = os.path.join(DATA_DIR, "faiss_index")
-    PRODUCT_DATA_PATH: str = os.path.join(DATA_DIR, "products")
-    MODEL_CACHE_PATH: str = os.path.join(DATA_DIR, "model_cache")
+    BASE_DIR: str = str(Path(__file__).parent.parent.parent)
+    DATA_DIR: str = str(Path(BASE_DIR) / "data")
+    EMBEDDINGS_SAVE_PATH: str = str(Path(BASE_DIR) / "data" / "embeddings")
+    FAISS_INDEX_PATH: str = str(Path(BASE_DIR) / "data" / "faiss_index")
+    PRODUCT_DATA_PATH: str = str(Path(BASE_DIR) / "data" / "products")
+    MODEL_CACHE_PATH: str = str(Path(BASE_DIR) / "data" / "model_cache")
     
     # 성능 및 리소스 설정
     MAX_WORKERS: int = 4
@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         ]
         
         for directory in directories:
-            os.makedirs(directory, exist_ok=True)
+            Path(directory).mkdir(parents=True, exist_ok=True)
     
     class Config:
         env_file = ".env"

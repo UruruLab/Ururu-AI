@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from datetime import datetime
 from enum import Enum
+from decimal import Decimal
 
 
 class ProductStatus(str, Enum):
@@ -28,7 +29,7 @@ class ProductBase(BaseModel):
     ingredients: Optional[str] = Field(None, description="성분 정보")
     category_main: ProductCategory = Field(..., description="상위 카테고리")
     category_sub: str = Field(..., description="하위 카테고리")
-    base_price: float = Field(..., ge=0, description="기본 가격")
+    base_price: Decimal = Field(..., ge=0, description="기본 가격")
 
 
 class ProductCreate(ProductBase):
@@ -38,7 +39,7 @@ class ProductCreate(ProductBase):
 class ProductOption(BaseModel):
     id: int
     option_name: str = Field(..., description="옵션명")
-    option_price: float = Field(..., ge=0, description="옵션 가격")
+    option_price: Decimal = Field(..., ge=0, description="옵션 가격")
     image_url: Optional[str] = Field(None, description="옵션 이미지 URL")
     additional_info: Optional[str] = Field(None, description="옵션 관련 추가 정보")
     is_active: bool = Field(default=True, description="활성화 상태")
@@ -66,6 +67,13 @@ class ProductEmbedding(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
     
+    @validator('embedding_vector')
+    def validate_embedding_dimension(cls, v, values):
+        expected_dim = values.get('embedding_dimension', 768)
+        if len(v) != expected_dim:
+            raise ValueError(f"임베딩 벡터 차원이 일치하지 않습니다. 예상: {expected_dim}, 실제: {len(v)}")
+        return v
+    
     class Config:
         from_attributes = True
 
@@ -88,7 +96,7 @@ class ProductRecommendationRequest(BaseModel):
     exclude_categories: Optional[List[ProductCategory]] = Field(default=None, description="제외할 카테고리")
     include_categories: Optional[List[ProductCategory]] = Field(default=None, description="포함할 카테고리")
     min_similarity: Optional[float] = Field(default=0.3, ge=0, le=1, description="최소 유사도 임계값")
-    max_price: Optional[float] = Field(default=None, ge=0, description="최대 가격 필터")
+    max_price: Optional[Decimal] = Field(default=None, ge=0, description="최대 가격 필터")
 
 
 class RecommendedProduct(BaseModel):
