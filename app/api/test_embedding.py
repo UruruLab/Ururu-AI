@@ -203,7 +203,6 @@ async def test_model_embeddings():
 )
 async def clear_loaded_models():
     """로딩된 모든 모델 메모리에서 제거"""
-    global loaded_models
 
     model_count = len(loaded_models)
     loaded_models.clear()
