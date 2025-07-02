@@ -6,11 +6,12 @@ from app.services.user_tower_service import UserTowerService
 
 router = APIRouter()
 
+
 @router.post("/profile-embedding")
 async def create_user_embedding(
     profile: BeautyProfile,
     model: SentenceTransformer = Depends(get_embedding_model)
-    ):
+):
     """사용자 뷰티 프로필을 임베딩 벡터로 변환합니다."""
     try:
         service = UserTowerService(model) 

@@ -2,6 +2,7 @@ from app.models.user import BeautyProfile
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
+
 class UserTowerService:
     def __init__(self, model: SentenceTransformer):
         self.model = model
