@@ -80,7 +80,7 @@ async def get_model_list():
     }
 
 @router.get(
-    "models/load-single/{model_key}",
+    "/models/load-single/{model_key}",
     tags=["모델 테스트"],
     summary="단일 모델 로드",
     description="주어진 모델 키에 해당하는 모델을 로드하고, 로드 성공 여부와 메모리 사용량을 반환합니다."
@@ -88,7 +88,7 @@ async def get_model_list():
 async def load_single_model(model_key: str):
     """단일 모델 로딩 테스트"""
     if model_key not in MODELS_TO_TEST:
-        raise HTTPException(status_code=404, detail="모델을 찾을 수 없습니다.: {model_key}")
+        raise HTTPException(status_code=404, detail=f"모델을 찾을 수 없습니다.: {model_key}")
     
     model_name = MODELS_TO_TEST[model_key]
     result = _load_model(model_key, model_name)
@@ -210,6 +210,6 @@ async def clear_loaded_models():
     return {
         "status": "success",
         "message": f"{model_count}개의 로딩된 모델이 메모리에서 제거되었습니다.",
-        "current_memmory_mdb": round(get_memory_usage(), 2)
+        "current_memmory_mb": round(get_memory_usage(), 2)
     }
     
