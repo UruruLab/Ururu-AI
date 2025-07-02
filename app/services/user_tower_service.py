@@ -1,5 +1,5 @@
-from add.models.user import BeautyProfile
-from sentance_transformers import SentenceTransformer
+from app.models.user import BeautyProfile
+from sentence_transformers import SentenceTransformer
 import numpy as np
 
 class UserTowerService:

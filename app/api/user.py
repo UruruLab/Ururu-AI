@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sentence_transformers import SentenceTransformer
 from app.core.dependencies import get_embedding_model
 from app.models.user import BeautyProfile
 from app.services.user_tower_service import UserTowerService
@@ -12,7 +13,7 @@ async def create_user_embedding(
     ):
     """사용자 뷰티 프로필을 임베딩 벡터로 변환합니다."""
     try:
-        model = UserTowerService(model) 
+        service = UserTowerService(model) 
         natural_text = service.profile_to_text(profile)
         embedding = service.generate_user_embedding(profile)
 
