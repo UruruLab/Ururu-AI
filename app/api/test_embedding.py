@@ -6,7 +6,6 @@ import time
 import psutil
 import gc
 import os
-from typing import Dict, List, Any
 
 router = APIRouter()
 
@@ -32,7 +31,8 @@ class ModelComparisonResult(BaseModel):
 
 def get_memory_usage():
     gc.collect()
-    torch.cuda.empty_cache()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
     return psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
 
 def _load_model(model_key: str, model_name: str) -> ModelComparisonResult:
