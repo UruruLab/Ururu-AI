@@ -1,4 +1,4 @@
-from pydatic import BaseModel
+from pydantic import BaseModel
 from typing import List, Optional
 from enum import Enum
 
@@ -25,6 +25,7 @@ class SkinTone(str, Enum):
 class BeautyProfile(BaseModel):
     skin_type: SkinType
     skin_tone: SkinTone
+    concerns: List[str]
     has_allergy: bool
     allergies: Optional[List[str]] = []
     interest_categories: List[str]
