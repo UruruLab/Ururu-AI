@@ -22,10 +22,26 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+.env.development
+.env.production
+.env.staging
 
 # Logs
 *.log
 
+# AI Models and Data
+data/
+models/
+*.h5
+*.pkl
+*.joblib
+
+# Model cache
+.cache/
+model_cache/
+
 # AWS credentials
 .aws/
-EOF
+
+# Docker
+.dockerignore
