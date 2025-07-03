@@ -46,21 +46,11 @@ class TextPreprocessor:
     @staticmethod
     def normalize_korean_text(text: str) -> str:
         """한국어 텍스트 정규화"""
-        # 자주 사용되는 축약어/줄임말 확장
-        replacements = {
-            '보습': '보습',
-            '탄력': '탄력',
-            '미백': '미백',
-            '주름': '주름개선',
-            '트러블': '트러블케어',
-            '민감성': '민감성피부',
-            '건성': '건성피부',
-            '지성': '지성피부',
-            '복합성': '복합성피부'
-        }
+        # 설정에서 정규화 매핑 가져오기
+        replacements = settings.BEAUTY_TERMS_MAPPING
         
-        for old, new in replacements.items():
-            text = text.replace(old, new)
+        for original, normalized in replacements.items():
+            text = text.replace(original, normalized)
         
         return text
     
@@ -101,7 +91,8 @@ class TextPreprocessor:
         final_text = cls.remove_stopwords(combined_text)
         
         # 최대 길이 제한 (BERT 모델 제한 고려)
-        if len(final_text) > settings.MAX_SEQUENCE_LENGTH * 2:  # 대략적인 토큰 수 계산
+        # 한국어는 토큰화 시 더 많은 토큰이 생성될 수 있어 보수적으로 제한
+        if len(final_text) > settings.MAX_SEQUENCE_LENGTH * 2:
             final_text = final_text[:settings.MAX_SEQUENCE_LENGTH * 2]
         
         return final_text
@@ -298,7 +289,11 @@ class EmbeddingService(EmbeddingServiceInterface):
     
     def encode_text(self, text: str) -> List[float]:
         """단일 텍스트를 임베딩으로 변환"""
+        # 빈 텍스트나 공백만 있는 텍스트 처리
         if not text or not text.strip():
+            logger.warning("빈 텍스트가 입력되어 제로 벡터를 반환합니다.")
+            # 화장품 도메인에서는 텍스트 정보가 중요하므로 제로 벡터 사용
+            # 이는 해당 상품이 추천에서 자연스럽게 제외되도록 함
             return [0.0] * settings.EMBEDDING_DIMENSION
         
         # 캐시 확인
