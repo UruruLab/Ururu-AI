@@ -80,12 +80,18 @@ class ProductTowerService:
         return text.strip()
     
     def _normalize_beauty_terms(self, text: str) -> str:
-        """뷰티 관련 용어 정규화"""
+        """뷰티 관련 용어 정규화 (중복 방지)"""
         # 설정에서 뷰티 용어 매핑 가져오기
         beauty_terms = settings.BEAUTY_TERMS_MAPPING
         
-        for original, normalized in beauty_terms.items():
-            text = text.replace(original, normalized)
+        # 길이 순으로 정렬하여 긴 키워드부터 처리 (중복 방지)
+        sorted_terms = sorted(beauty_terms.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for original, normalized in sorted_terms:
+            # 단어 경계를 고려한 정확한 매칭
+            import re
+            pattern = rf'\b{re.escape(original)}\b'
+            text = re.sub(pattern, normalized, text)
         
         return text
     
@@ -253,7 +259,7 @@ class ProductTowerService:
             logger.error(f"유사도 계산 오류: {e}")
             return 0.0
     
-    def generate_recommendation_reason(self, product: Product, 
+    def generate_recommendation_reason(self, product: Product,
                                      matched_keywords: List[str],
                                      similarity_score: float) -> str:
         """추천 이유 생성"""
