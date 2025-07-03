@@ -55,14 +55,13 @@ class TextPreprocessor:
         return text
     
     @classmethod
-    def preprocess_product_text(cls, product_name: str, brand: str,
+    def preprocess_product_text(cls, product_name: str,
                               description: str, ingredients: str = None,
                               category: str = None) -> str:
-        """상품 정보를 임베딩용 텍스트로 전처리"""
+        """상품 정보를 임베딩용 텍스트로 전처리 (브랜드 제외)"""
         
         # 각 필드별 전처리
         clean_name = cls.clean_text(product_name)
-        clean_brand = cls.clean_text(brand)
         clean_description = cls.clean_text(description)
         clean_ingredients = cls.clean_text(ingredients) if ingredients else ""
         clean_category = cls.clean_text(category) if category else ""
@@ -71,13 +70,11 @@ class TextPreprocessor:
         clean_description = cls.normalize_korean_text(clean_description)
         clean_ingredients = cls.normalize_korean_text(clean_ingredients)
         
-        # 통합 텍스트 구성
+        # 통합 텍스트 구성 (브랜드 제외)
         parts = []
         
         if clean_name:
             parts.append(f"상품명: {clean_name}")
-        if clean_brand:
-            parts.append(f"브랜드: {clean_brand}")
         if clean_category:
             parts.append(f"카테고리: {clean_category}")
         if clean_description:
@@ -124,14 +121,14 @@ class ProductEmbeddingGenerator:
         self.embedding_service = embedding_service
         self.preprocessor = TextPreprocessor()
         
-    def generate_product_embedding(self, product_name: str, brand: str,
+    def generate_product_embedding(self, product_name: str,
                                  description: str, ingredients: str = None,
                                  category: str = None) -> Tuple[List[float], str]:
-        """단일 상품의 임베딩 생성"""
+        """단일 상품의 임베딩 생성 (브랜드 제외)"""
         
         # 텍스트 전처리
         processed_text = self.preprocessor.preprocess_product_text(
-            product_name, brand, description, ingredients, category
+            product_name, description, ingredients, category
         )
         
         logger.info(f"상품 임베딩 생성 중: {product_name[:20]}...")
@@ -147,7 +144,7 @@ class ProductEmbeddingGenerator:
             raise
     
     def generate_batch_embeddings(self, products_data: List[Dict]) -> List[Tuple[List[float], str]]:
-        """여러 상품의 임베딩을 배치로 생성"""
+        """여러 상품의 임베딩을 배치로 생성 (브랜드 제외)"""
         
         processed_texts = []
         
@@ -155,7 +152,6 @@ class ProductEmbeddingGenerator:
         for product in products_data:
             processed_text = self.preprocessor.preprocess_product_text(
                 product.get('name', ''),
-                product.get('brand', ''),
                 product.get('description', ''),
                 product.get('ingredients'),
                 product.get('category')
