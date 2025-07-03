@@ -31,10 +31,13 @@ Thumbs.db
 
 # AI Models and Data
 data/
-models/
-*.h5
+# ML 모델 파일들만 무시 (소스코드는 무시하지 않음)
 *.pkl
-*.joblib
+*.h5
+*.pth
+*.onnx
+*.bin
+*.safetensors
 
 # Model cache
 .cache/

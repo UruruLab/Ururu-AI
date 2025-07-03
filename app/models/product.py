@@ -86,7 +86,6 @@ class ProductProfile(BaseModel):
     benefits: List[str] = Field(..., description="제품 효능/혜택")
     price_range: str = Field(..., description="가격대")
     target_concerns: List[str] = Field(..., description="타겟 피부 고민")
-    brand_positioning: str = Field(..., description="브랜드 포지셔닝")
 
 
 class ProductRecommendationRequest(BaseModel):
