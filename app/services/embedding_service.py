@@ -1,8 +1,10 @@
 import re
+import time
 import logging
 from typing import List, Dict, Tuple, Optional
 from abc import ABC, abstractmethod
 from datetime import datetime
+from sentence_transformers import SentenceTransformer
 
 from app.core.config import settings
 
@@ -63,7 +65,7 @@ class TextPreprocessor:
         return text
     
     @classmethod
-    def preprocess_product_text(cls, product_name: str, brand: str, 
+    def preprocess_product_text(cls, product_name: str, brand: str,
                               description: str, ingredients: str = None,
                               category: str = None) -> str:
         """상품 정보를 임베딩용 텍스트로 전처리"""
@@ -245,4 +247,107 @@ class EmbeddingCache:
         return {
             "total_items": len(self._cache),
             "ttl_seconds": self.ttl_seconds
+        }
+
+
+class EmbeddingService(EmbeddingServiceInterface):
+    """SentenceTransformer 기반 임베딩 서비스 구현체"""
+    
+    def __init__(self):
+        self.model_name = settings.EMBEDDING_MODEL_NAME
+        self.model = None
+        self.cache = EmbeddingCache()
+        self._validate_model_config()
+        self._load_model()
+    
+    def _validate_model_config(self):
+        """모델 설정 검증"""
+        logger.info(f"🔧 현재 환경: {settings.ENVIRONMENT}")
+        logger.info(f"📝 임베딩 모델: {self.model_name}")
+        logger.info(f"📏 임베딩 차원: {settings.EMBEDDING_DIMENSION}")
+        logger.info(f"📊 배치 크기: {settings.PRODUCT_EMBEDDING_BATCH_SIZE}")
+        
+        # 개발 환경에서 경량 모델 사용 권장
+        if settings.is_development and "large" in self.model_name.lower():
+            logger.warning("⚠️  개발 환경에서 대형 모델을 사용하고 있습니다. 성능 이슈가 있을 수 있습니다.")
+        
+        # 운영 환경에서 한국어 모델 사용 권장
+        if settings.is_production and "kr-" not in self.model_name.lower():
+            logger.warning("⚠️  운영 환경에서 한국어 특화 모델이 아닙니다. 성능 확인이 필요합니다.")
+    
+    def _load_model(self):
+        """모델 로드"""
+        try:
+            logger.info(f"🤖 임베딩 모델 로드 시작: {self.model_name}")
+            start_time = time.time()
+            
+            self.model = SentenceTransformer(self.model_name)
+            
+            load_time = time.time() - start_time
+            logger.info(f"✅ 임베딩 모델 로드 완료 ({load_time:.2f}초)")
+            
+            # 모델 정보 검증
+            model_dim = self.model.get_sentence_embedding_dimension()
+            if model_dim != settings.EMBEDDING_DIMENSION:
+                logger.error(f"❌ 모델 차원 불일치: 설정={settings.EMBEDDING_DIMENSION}, 실제={model_dim}")
+                raise ValueError(f"모델 차원이 설정과 다릅니다: {model_dim} != {settings.EMBEDDING_DIMENSION}")
+                
+        except Exception as e:
+            logger.error(f"❌ 모델 로드 실패: {e}")
+            raise
+    
+    def encode_text(self, text: str) -> List[float]:
+        """단일 텍스트를 임베딩으로 변환"""
+        if not text or not text.strip():
+            return [0.0] * settings.EMBEDDING_DIMENSION
+        
+        # 캐시 확인
+        cached_embedding = self.cache.get(text, self.model_name)
+        if cached_embedding:
+            return cached_embedding
+        
+        try:
+            # 임베딩 생성
+            embedding = self.model.encode(text, convert_to_tensor=False)
+            embedding_list = embedding.tolist()
+            
+            # 캐시 저장
+            self.cache.set(text, self.model_name, embedding_list)
+            
+            return embedding_list
+            
+        except Exception as e:
+            logger.error(f"임베딩 생성 실패: {e}")
+            return [0.0] * settings.EMBEDDING_DIMENSION
+    
+    def encode_batch(self, texts: List[str]) -> List[List[float]]:
+        """여러 텍스트를 배치로 임베딩 변환"""
+        if not texts:
+            return []
+        
+        try:
+            # 배치 임베딩 생성
+            embeddings = self.model.encode(texts, convert_to_tensor=False, batch_size=settings.PRODUCT_EMBEDDING_BATCH_SIZE)
+            
+            # 각각 캐시에 저장
+            results = []
+            for text, embedding in zip(texts, embeddings):
+                embedding_list = embedding.tolist()
+                self.cache.set(text, self.model_name, embedding_list)
+                results.append(embedding_list)
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"배치 임베딩 생성 실패: {e}")
+            # 실패 시 개별적으로 처리
+            return [self.encode_text(text) for text in texts]
+    
+    def get_model_info(self) -> Dict[str, str]:
+        """모델 정보 반환"""
+        return {
+            "model_name": self.model_name,
+            "model_type": "SentenceTransformer",
+            "embedding_dimension": str(settings.EMBEDDING_DIMENSION),
+            "max_sequence_length": str(settings.MAX_SEQUENCE_LENGTH)
         }
