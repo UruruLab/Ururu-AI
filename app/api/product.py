@@ -28,7 +28,7 @@ async def create_product(
         
         product = Product(
             id=1,  # 임시 ID
-            **product_data.dict(),
+            **product_data.model_dump(),
             created_at=datetime.now()
         )
         
