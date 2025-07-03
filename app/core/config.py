@@ -50,11 +50,6 @@ class Settings(BaseSettings):
     LOG_LEVEL: str
     LOG_FORMAT: str
     
-    # 브랜드 분류 (환경변수에서만 가져옴)
-    PREMIUM_BRANDS: str  # 콤마 구분 문자열
-    DRUGSTORE_BRANDS: str  # 콤마 구분 문자열
-    KOREAN_BRANDS: str  # 콤마 구분 문자열
-    
     # 상품 카테고리 설정 (고정값 - 비즈니스 로직)
     MAIN_CATEGORIES: List[str] = [
         "스킨케어", "메이크업", "클렌징", "마스크팩", 
@@ -116,18 +111,6 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(',') if item.strip()]
         return []
-    
-    def get_premium_brands(self) -> List[str]:
-        """프리미엄 브랜드 리스트 반환"""
-        return self.parse_comma_separated_list(self.PREMIUM_BRANDS)
-    
-    def get_drugstore_brands(self) -> List[str]:
-        """드럭스토어 브랜드 리스트 반환"""
-        return self.parse_comma_separated_list(self.DRUGSTORE_BRANDS)
-    
-    def get_korean_brands(self) -> List[str]:
-        """한국 브랜드 리스트 반환"""
-        return self.parse_comma_separated_list(self.KOREAN_BRANDS)
     
     def ensure_directories(self):
         """필요한 디렉토리들을 생성"""

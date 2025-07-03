@@ -28,9 +28,6 @@ class ProductTowerService:
         # 기본 정보
         if product.name:
             components.append(f"상품명: {self._clean_text(product.name)}")
-        
-        if product.brand:
-            components.append(f"브랜드: {self._clean_text(product.brand)}")
             
         if product.category_main:
             components.append(f"카테고리: {product.category_main.value}")
@@ -129,8 +126,7 @@ class ProductTowerService:
             key_ingredients=key_ingredients,
             benefits=benefits,
             price_range=self._get_price_range(product.base_price),
-            target_concerns=target_concerns,
-            brand_positioning=self._get_brand_positioning(product.brand)
+            target_concerns=target_concerns
         )
     
     def _extract_skin_compatibility(self, product: Product) -> List[str]:
@@ -225,18 +221,6 @@ class ProductTowerService:
         
         return found_concerns[:settings.MAX_TARGET_CONCERNS]
     
-    def _get_brand_positioning(self, brand: str) -> str:
-        """브랜드 포지셔닝 분류"""
-        # 설정에서 브랜드 분류 가져오기
-        if brand in settings.get_premium_brands():
-            return "프리미엄"
-        elif brand in settings.get_drugstore_brands():
-            return "드럭스토어"
-        elif brand in settings.get_korean_brands():
-            return "K뷰티"
-        else:
-            return "일반"
-    
     def calculate_similarity_score(self, user_vector: List[float], 
                                  product_vector: List[float]) -> float:
         """사용자와 상품 벡터 간 코사인 유사도 계산"""
@@ -284,9 +268,5 @@ class ProductTowerService:
             reasons.append("높은 유사도를 보입니다")
         else:
             reasons.append("적절한 유사도를 보입니다")
-        
-        # 브랜드 신뢰도
-        if product.brand:
-            reasons.append(f"{product.brand} 브랜드 제품입니다")
         
         return ". ".join(reasons) + "."
