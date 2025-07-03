@@ -1,10 +1,12 @@
 import re
 import logging
-from typing import List, Dict, Tuple, Optional
+from typing import List
 from datetime import datetime
 import numpy as np
 
 from app.models.product import Product, ProductProfile, ProductCategory
+from app.services.embedding_service import EmbeddingServiceInterface
+from app.core.config import settings
 
 
 logger = logging.getLogger(__name__)
@@ -13,9 +15,10 @@ logger = logging.getLogger(__name__)
 class ProductTowerService:
     """Product Tower 서비스 - User Tower와 대칭적 구조"""
     
-    def __init__(self):
-        self.model_name = "snunlp/KR-SBERT-V40K-klueNLI-augSTS"
-        self.embedding_dim = 768
+    def __init__(self, embedding_service: EmbeddingServiceInterface):
+        self.embedding_service = embedding_service
+        self.model_name = embedding_service.get_model_info().get('model_name', settings.EMBEDDING_MODEL_NAME)
+        self.embedding_dim = settings.EMBEDDING_DIMENSION
         
     def preprocess_product_text(self, product: Product) -> str:
         """상품 정보를 임베딩용 텍스트로 전처리"""
@@ -55,7 +58,7 @@ class ProductTowerService:
         combined_text = " | ".join(components)
         
         # 길이 제한 (BERT 모델 제한 고려)
-        max_length = 512 * 2  # 대략적인 토큰 수 계산
+        max_length = settings.TEXT_MAX_LENGTH
         if len(combined_text) > max_length:
             combined_text = combined_text[:max_length]
         
@@ -79,24 +82,8 @@ class ProductTowerService:
     
     def _normalize_beauty_terms(self, text: str) -> str:
         """뷰티 관련 용어 정규화"""
-        # 자주 사용되는 뷰티 용어들을 표준화
-        beauty_terms = {
-            '보습': '보습 수분공급',
-            '수분': '수분 보습',
-            '탄력': '탄력 안티에이징',
-            '미백': '미백 브라이트닝',
-            '주름': '주름개선 안티에이징',
-            '트러블': '트러블케어 진정',
-            '민감': '민감성피부 순한',
-            '건성': '건성피부 보습',
-            '지성': '지성피부 유분조절',
-            '복합성': '복합성피부',
-            '각질': '각질제거 엑스폴리에이션',
-            '모공': '모공케어 모공축소',
-            '여드름': '여드름 트러블케어',
-            '기미': '기미 미백',
-            '잡티': '잡티 브라이트닝'
-        }
+        # 설정에서 뷰티 용어 매핑 가져오기
+        beauty_terms = settings.BEAUTY_TERMS_MAPPING
         
         for original, normalized in beauty_terms.items():
             text = text.replace(original, normalized)
@@ -105,13 +92,13 @@ class ProductTowerService:
     
     def _get_price_range(self, price: float) -> str:
         """가격대 분류"""
-        if price < 10000:
+        if price < settings.PRICE_RANGE_LOW:
             return "저가"
-        elif price < 30000:
+        elif price < settings.PRICE_RANGE_MID_LOW:
             return "중저가"
-        elif price < 50000:
+        elif price < settings.PRICE_RANGE_MID:
             return "중가"
-        elif price < 100000:
+        elif price < settings.PRICE_RANGE_MID_HIGH:
             return "중고가"
         else:
             return "고가"
@@ -181,7 +168,7 @@ class ProductTowerService:
             if ingredient.lower() in ingredients_lower:
                 found_ingredients.append(ingredient)
         
-        return found_ingredients[:5]  # 최대 5개까지
+        return found_ingredients[:settings.MAX_KEY_INGREDIENTS]
     
     def _extract_benefits(self, description: str) -> List[str]:
         """제품 효능 추출"""
@@ -206,7 +193,7 @@ class ProductTowerService:
             if any(keyword in description_lower for keyword in keywords):
                 found_benefits.append(benefit)
         
-        return found_benefits[:4]  # 최대 4개까지
+        return found_benefits[:settings.MAX_BENEFITS]
     
     def _extract_target_concerns(self, description: str) -> List[str]:
         """타겟 피부 고민 추출"""
@@ -231,20 +218,16 @@ class ProductTowerService:
             if any(keyword in description_lower for keyword in keywords):
                 found_concerns.append(concern)
         
-        return found_concerns[:3]  # 최대 3개까지
+        return found_concerns[:settings.MAX_TARGET_CONCERNS]
     
     def _get_brand_positioning(self, brand: str) -> str:
         """브랜드 포지셔닝 분류"""
-        # 실제로는 브랜드 DB에서 가져와야 하지만, 간단한 분류로 대체
-        premium_brands = ["라로슈포제", "비쉬", "아벤느", "더오디너리", "SK-II"]
-        drugstore_brands = ["세타필", "니베아", "바세린"]
-        korean_brands = ["아이오페", "설화수", "후", "헤라", "이니스프리"]
-        
-        if brand in premium_brands:
+        # 설정에서 브랜드 분류 가져오기
+        if brand in settings.get_premium_brands():
             return "프리미엄"
-        elif brand in drugstore_brands:
+        elif brand in settings.get_drugstore_brands():
             return "드럭스토어"
-        elif brand in korean_brands:
+        elif brand in settings.get_korean_brands():
             return "K뷰티"
         else:
             return "일반"
