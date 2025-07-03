@@ -1,11 +1,11 @@
 from app.models.user import BeautyProfile
-from sentence_transformers import SentenceTransformer
+from app.services.embedding_service import EmbeddingService
 import numpy as np
 
 
 class UserTowerService:
-    def __init__(self, model: SentenceTransformer):
-        self.model = model
+    def __init__(self, embedding_service: EmbeddingService):
+        self.embedding_service = embedding_service
     
     def profile_to_text(self, profile: BeautyProfile) -> str:
         """뷰티 프로필을 자연어 텍스트로 변환"""
@@ -35,6 +35,6 @@ class UserTowerService:
     def generate_user_embedding(self, profile: BeautyProfile) -> np.ndarray:
         """뷰티 프로필을 임베딩 벡터로 변환"""
         profile_text = self.profile_to_text(profile)
-        embedding = self.model.encode(profile_text)
+        embedding = self.embedding_service.encode_text(profile_text)
         return embedding
         
