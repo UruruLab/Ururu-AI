@@ -90,7 +90,6 @@ class ProductTowerService:
         
         for original, normalized in sorted_terms:
             # 단어 경계를 고려한 정확한 매칭
-            import re
             pattern = rf'\b{re.escape(original)}\b'
             text = re.sub(pattern, normalized, text)
         
