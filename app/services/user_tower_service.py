@@ -36,5 +36,5 @@ class UserTowerService:
         """뷰티 프로필을 임베딩 벡터로 변환"""
         profile_text = self.profile_to_text(profile)
         embedding = self.embedding_service.encode_text(profile_text)
-        return embedding
+        return np.array(embedding)
         
