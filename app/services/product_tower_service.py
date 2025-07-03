@@ -53,6 +53,10 @@ class ProductTowerService:
         # 최종 텍스트 조합
         combined_text = " | ".join(components)
         
+        # 최소한의 정보 체크: 상품명과 카테고리만 있고 설명/성분이 없으면 기본 설명 추가
+        if not product.description and not product.ingredients and product.name:
+            combined_text += f" | 기본정보: {product.category_main.value} 상품"
+        
         # 길이 제한 (BERT 모델 제한 고려)
         max_length = settings.TEXT_MAX_LENGTH
         if len(combined_text) > max_length:
