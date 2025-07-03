@@ -1,7 +1,6 @@
 import re
 import logging
 from typing import List
-from datetime import datetime
 import numpy as np
 
 from app.models.product import Product, ProductProfile, ProductCategory
