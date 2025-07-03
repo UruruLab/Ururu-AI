@@ -22,10 +22,29 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+.env.development
+.env.production
+.env.staging
 
 # Logs
 *.log
 
+# AI Models and Data
+data/
+# ML 모델 파일들만 무시 (소스코드는 무시하지 않음)
+*.pkl
+*.h5
+*.pth
+*.onnx
+*.bin
+*.safetensors
+
+# Model cache
+.cache/
+model_cache/
+
 # AWS credentials
 .aws/
-EOF
+
+# Docker
+.dockerignore
