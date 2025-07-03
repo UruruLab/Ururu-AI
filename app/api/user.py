@@ -1,6 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from sentence_transformers import SentenceTransformer
-from app.core.dependencies import get_embedding_model
+from app.core.dependencies import get_user_tower_service
 from app.models.user import BeautyProfile
 from app.services.user_tower_service import UserTowerService
 
@@ -10,11 +9,10 @@ router = APIRouter()
 @router.post("/profile-embedding")
 async def create_user_embedding(
     profile: BeautyProfile,
-    model: SentenceTransformer = Depends(get_embedding_model)
+    service: UserTowerService = Depends(get_user_tower_service)
 ):
     """사용자 뷰티 프로필을 임베딩 벡터로 변환합니다."""
     try:
-        service = UserTowerService(model) 
         natural_text = service.profile_to_text(profile)
         embedding = service.generate_user_embedding(profile)
 
