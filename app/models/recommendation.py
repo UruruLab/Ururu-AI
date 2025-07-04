@@ -44,7 +44,7 @@ class RecommendationMetadata(BaseModel):
     processing_time_ms: int = Field(0, description="처리 시간 (밀리초)")
     total_candidates: int = Field(0, description="후보 아이템 총 개수")
     confidence_threshold: float = Field(0.7, description="신뢰도 임계값")
-    timestamp: datetime = Field(default_factory=datetime.now, description="추천 생성 시간")
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="추천 생성 시간 (UTC)")
     error: Optional[str] = Field(None, description="오류 메시지")
 
 

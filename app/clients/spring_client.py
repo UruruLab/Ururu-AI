@@ -43,10 +43,12 @@ class SpringBootClient:
             logger.error(f"Spring Boot 헬스체크 실패: {e}")
             raise
     
-    async def send_recommendation_result(self, 
-                                       member_id: int, 
-                                       recommendations: List[Dict[str, Any]],
-                                       metadata: Optional[Dict[str, Any]] = None) -> bool:
+    async def send_recommendation_result(
+            self,
+            member_id: int,
+            recommendations: List[Dict[str, Any]],
+            metadata: Optional[Dict[str, Any]] = None
+    ) -> bool:
         """AI 추천 결과를 Spring Boot에 전송
         
         Args:
@@ -72,17 +74,18 @@ class SpringBootClient:
             if result.get('success'):
                 logger.info(f"회원 {member_id}에 대한 추천 결과 전송 완료")
                 return True
-            else:
-                logger.warning(f"추천 결과 전송 실패: {result.get('message')}")
-                return False
+            logger.warning(f"추천 결과 전송 실패: {result.get('message')}")
+            return False
                 
         except Exception as e:
             logger.error(f"추천 결과 전송 실패: {e}")
             return False
     
-    async def notify_recommendation_request(self, 
-                                          member_id: int, 
-                                          request_type: str = "manual") -> bool:
+    async def notify_recommendation_request(
+            self,
+            member_id: int,
+            request_type: str = "manual"
+    ) -> bool:
         """추천 요청 알림을 Spring Boot에 전송
         
         Args:
@@ -106,19 +109,20 @@ class SpringBootClient:
             if result.get('success'):
                 logger.info(f"회원 {member_id}의 추천 요청 알림 전송 완료")
                 return True
-            else:
-                logger.warning(f"추천 요청 알림 전송 실패: {result.get('message')}")
-                return False
+            logger.warning(f"추천 요청 알림 전송 실패: {result.get('message')}")
+            return False
                 
         except Exception as e:
             logger.error(f"추천 요청 알림 전송 실패: {e}")
             return False
     
-    async def update_recommendation_feedback(self, 
-                                           member_id: int,
-                                           recommendation_id: str,
-                                           feedback_type: str,
-                                           feedback_data: Dict[str, Any]) -> bool:
+    async def update_recommendation_feedback(
+            self,
+            member_id: int,
+            recommendation_id: str,
+            feedback_type: str,
+            feedback_data: Dict[str, Any]
+    ) -> bool:
         """추천 피드백 정보를 Spring Boot에 전송
         
         Args:
@@ -146,9 +150,8 @@ class SpringBootClient:
             if result.get('success'):
                 logger.info(f"추천 피드백 전송 완료: {recommendation_id}")
                 return True
-            else:
-                logger.warning(f"추천 피드백 전송 실패: {result.get('message')}")
-                return False
+            logger.warning(f"추천 피드백 전송 실패: {result.get('message')}")
+            return False
                 
         except Exception as e:
             logger.error(f"추천 피드백 전송 실패: {e}")
