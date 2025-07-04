@@ -70,4 +70,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 EXPOSE 8000
 
 # 운영 서버 실행 (Gunicorn 사용)
-CMD ["sh", "-c", "gunicorn app.main:app -w ${GUNICORN_WORKERS:-4} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --access-logfile /app/logs/access.log --error-logfile /app/logs/error.log --log-level info"]
+CMD ["sh", "-c", "gunicorn app.main:app -w ${GUNICORN_WORKERS} -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --access-logfile /app/logs/access.log --error-logfile /app/logs/error.log --log-level info"]

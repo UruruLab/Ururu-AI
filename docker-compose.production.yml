@@ -9,6 +9,7 @@ services:
       - LOG_LEVEL=INFO
       # 운영환경에서는 Spring Boot 서버 IP/도메인으로 설정
       - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://api.ururu.shop}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
     ports:
       - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근 가능
     deploy:

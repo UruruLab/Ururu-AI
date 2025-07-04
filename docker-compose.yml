@@ -34,11 +34,12 @@ services:
       - HTTP_TIMEOUT=${HTTP_TIMEOUT:-30}
       - HTTP_RETRY_COUNT=${HTTP_RETRY_COUNT:-3}
       - HTTP_RETRY_DELAY=${HTTP_RETRY_DELAY:-1}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
     env_file:
       - ./config/.env.${ENVIRONMENT:-development}
     depends_on:
       config-fetcher:
-        condition: service_completed_successfully
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
