@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     CACHE_TTL_SECONDS: int
     BATCH_PROCESSING_DELAY: float
     
+    # Spring Boot 연동 설정 (환경변수에서만 가져옴)
+    SPRING_BOOT_BASE_URL: str = "http://localhost:8080"
+    HTTP_TIMEOUT: float = 30.0
+    HTTP_RETRY_COUNT: int = 3
+    HTTP_RETRY_DELAY: float = 1.0
+    
     # 로깅 설정 (환경변수에서만 가져옴)
     LOG_LEVEL: str
     LOG_FORMAT: str
