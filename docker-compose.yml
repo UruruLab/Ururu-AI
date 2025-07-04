@@ -14,7 +14,7 @@ services:
     command: /scripts/fetch-config.sh
     restart: "no"
 
-  # FastAPI AI 추천 서비스 (Spring Boot와 내부 통신용)
+  # FastAPI AI 추천 서비스 (Spring Boot 서버와 통신)
   ururu-ai:
     build:
       context: .
@@ -22,7 +22,7 @@ services:
       target: ${BUILD_TARGET:-development}
     container_name: ururu-ai-service
     ports:
-      - "${AI_PORT:-8000}:8000"
+      - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근용
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config:ro

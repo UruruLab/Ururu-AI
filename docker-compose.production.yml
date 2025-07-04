@@ -7,8 +7,10 @@ services:
     environment:
       - DEBUG=false
       - LOG_LEVEL=INFO
-      - SPRING_BOOT_BASE_URL=http://spring-boot-service:8080
-    ports: []  # 운영에서는 외부 포트 노출 안함 (Spring Boot만 접근)
+      # 운영환경에서는 Spring Boot 서버 IP/도메인으로 설정
+      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://api.ururu.shop}
+    ports:
+      - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근 가능
     deploy:
       replicas: 2
       resources:
