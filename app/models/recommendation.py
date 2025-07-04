@@ -22,7 +22,6 @@ class RecommendationItem(BaseModel):
     discount_rate: Optional[float] = Field(None, description="할인율")
     image_url: Optional[str] = Field(None, description="대표 이미지 URL")
     category_names: List[str] = Field(default_factory=list, description="카테고리명 리스트")
-    brand_name: Optional[str] = Field(None, description="브랜드명")
     
     # 추천 관련 메타데이터
     similarity_score: float = Field(..., ge=0.0, le=1.0, description="유사도 점수")
@@ -95,7 +94,6 @@ class ProductInfo(BaseModel):
     product_id: int = Field(..., description="상품 ID")
     name: str = Field(..., description="상품명")
     description: Optional[str] = Field(None, description="상품 설명")
-    brand_name: Optional[str] = Field(None, description="브랜드명")
     categories: List[str] = Field(default_factory=list, description="카테고리 리스트")
     ingredients: Optional[str] = Field(None, description="성분 정보")
     effects: Optional[str] = Field(None, description="효과/효능")
@@ -105,9 +103,6 @@ class ProductInfo(BaseModel):
         """상품 정보를 임베딩용 텍스트로 변환"""
         parts = [f"상품명: {self.name}"]
         
-        if self.brand_name:
-            parts.append(f"브랜드: {self.brand_name}")
-            
         if self.categories:
             parts.append(f"카테고리: {', '.join(self.categories)}")
             
