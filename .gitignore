@@ -28,6 +28,7 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
 
 # AI Models and Data
 data/
@@ -48,3 +49,10 @@ model_cache/
 
 # Docker
 .dockerignore
+
+# Private Config (동적으로 가져오는 설정들)
+config/
+ssl/
+
+# Runtime
+*.pid

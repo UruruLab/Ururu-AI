@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Private Config 가져오기 서비스
+  config-fetcher:
+    image: alpine/git:latest
+    volumes:
+      - ./config:/config
+      - ./scripts:/scripts:ro
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - CONFIG_REPO_URL=https://github.com/UruruLab/Ururu-AI-Config.git
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+    command: /scripts/fetch-config.sh
+    restart: "no"
+
+  # FastAPI AI 추천 서비스 (Spring Boot 서버와 통신)
+  ururu-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: ${BUILD_TARGET:-development}
+    container_name: ururu-ai-service
+    ports:
+      - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근용
+    volumes:
+      - ./logs:/app/logs
+      - ./config:/app/config:ro
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-development}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://host.docker.internal:8080}
+      - HTTP_TIMEOUT=${HTTP_TIMEOUT:-30}
+      - HTTP_RETRY_COUNT=${HTTP_RETRY_COUNT:-3}
+      - HTTP_RETRY_DELAY=${HTTP_RETRY_DELAY:-1}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+    env_file:
+      - ./config/.env.${ENVIRONMENT:-development}
+    depends_on:
+      config-fetcher:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - ururu-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+networks:
+  ururu-network:
+    driver: bridge
+    name: ururu-network
+
+volumes:
+  logs:
+    driver: local
+  config:
+    driver: local

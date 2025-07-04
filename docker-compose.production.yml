@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  ururu-ai:
+    build:
+      target: production
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      # 운영환경에서는 Spring Boot 서버 IP/도메인으로 설정
+      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://api.ururu.shop}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+    ports:
+      - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근 가능
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # 운영용 로그 수집 (Fluent Bit)
+  fluent-bit:
+    image: fluent/fluent-bit:latest
+    container_name: ururu-ai-logs
+    volumes:
+      - ./logs:/var/log/app:ro
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    networks:
+      - ururu-network
+    restart: unless-stopped
