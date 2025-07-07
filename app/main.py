@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import recommendations, admin
+from app.api import recommendations, admin, product
 from app.clients.spring_client import close_spring_client
 
 app = FastAPI(
@@ -11,6 +11,7 @@ app = FastAPI(
 # 추천 API 라우터 등록
 app.include_router(recommendations.router)
 app.include_router(admin.router)
+app.include_router(product.router)
 
 @app.get("/")
 async def root():

@@ -6,7 +6,7 @@
 from .base import Base
 from .spring_models import (
     DBProduct, DBProductOption, DBMember, DBBeautyProfile,
-    DBProductCategory, DBProductNotice, DBProductTag
+    DBProductCategory, DBProductNotice, DBProductTag, DBCategory
 )
 from .ai_models import (
     DBProductEmbedding, DBRecommendationResult, DBVectorIndex, DBUserEmbedding
@@ -15,7 +15,7 @@ from .ai_models import (
 # 그룹별 리스트
 SPRING_MODELS = [
     DBProduct, DBProductOption, DBMember, DBBeautyProfile,
-    DBProductCategory, DBProductNotice, DBProductTag
+    DBProductCategory, DBProductNotice, DBProductTag, DBCategory
 ]
 
 AI_MODELS = [
@@ -28,7 +28,7 @@ __all__ = [
     "Base",
     # Spring Boot 모델들
     "DBProduct", "DBProductOption", "DBMember", "DBBeautyProfile",
-    "DBProductCategory", "DBProductNotice", "DBProductTag",
+    "DBProductCategory", "DBProductNotice", "DBProductTag", "DBCategory"
     # AI 모델들
     "DBProductEmbedding", "DBRecommendationResult", "DBVectorIndex", "DBUserEmbedding",
     # 그룹
