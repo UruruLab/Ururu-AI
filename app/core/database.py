@@ -109,10 +109,24 @@ async def check_required_tables():
 async def init_database():
     if await test_database_connection():
         await check_required_tables()
+        await create_ai_tables()
         logger.info("데이터베이스 초기화 완료")
     else:
         logger.error("데이터베이스 초기화 실패: 연결 오류")
         raise Exception("데이터베이스 연결 실패")
+    
+async def create_ai_tables():
+    """AI 관련 테이블 생성"""
+    from app.models.database import AI_MODELS, Base
+
+    try:
+        async with async_engine.begin() as conn:
+            for model in AI_MODELS:
+                await conn.run_sync(model.__table__.create, checkfirst=True)
+        logger.info("AI 관련 테이블 생성 완료")
+    except Exception as e:
+        logger.warning(f"AI 관련 테이블 생성 중 오류 발생: {e}")
+
     
 async def close_database():
     await async_engine.dispose()
