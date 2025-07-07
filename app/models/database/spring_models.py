@@ -3,7 +3,7 @@ Spring Boot와 공유하는 테이블들
 - 읽기 전용으로 사용
 - Spring Boot에서 생성/관리하는 테이블들
 """
-from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, JSON, BigInteger
+from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, JSON, BigInteger, DateTime
 from sqlalchemy.orm import relationship
 from .base import Base, BaseEntity
 

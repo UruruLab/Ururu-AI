@@ -1,8 +1,8 @@
+# app/core/config.py 완전 수정 버전
 from pydantic_settings import BaseSettings
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pathlib import Path
 import os
-
 
 class Settings(BaseSettings):
     # 서버 설정 (고정값)
@@ -110,8 +110,6 @@ class Settings(BaseSettings):
     VECTOR_INDEX_PATH: str = "data/faiss_index"
     VECTOR_BACKUP_S3_PREFIX: str = "vector-indices"
     
-
-    
     # 파일 경로 설정 (동적 계산)
     @property
     def BASE_DIR(self) -> str:
@@ -136,6 +134,25 @@ class Settings(BaseSettings):
     @property
     def MODEL_CACHE_PATH(self) -> str:
         return str(Path(self.BASE_DIR) / "data" / "model_cache")
+    
+    @property
+    def database_url(self) -> str:
+        """동기 데이터베이스 URL"""
+        return f"mysql+pymysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
+    
+    @property
+    def async_database_url(self) -> str:
+        """비동기 데이터베이스 URL"""
+        return f"mysql+aiomysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
+    
+    def is_database_configured(self) -> bool:
+        """실제 데이터베이스 설정 여부 확인"""
+        return (
+            self.DB_HOST != "localhost" and 
+            self.DB_USERNAME != "root" and
+            self.DB_PASSWORD != "password" and
+            len(self.DB_PASSWORD) > 5  
+        )
     
     @staticmethod
     def parse_comma_separated_list(value: str) -> List[str]:
@@ -176,23 +193,25 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT == "production"
     
     class Config:
-        # 환경변수 파일 경로 설정 (Docker에서 오버라이드 가능)
-        env_file = os.getenv("ENV_FILE_PATH", ".env")
+        # 🔧 올바른 환경변수 파일 경로 설정
+        env_file = ".env.development"  # 실제 파일명과 일치
         env_file_encoding = "utf-8"
         case_sensitive = True
 
-    @property
-    def database_url(self) -> str:
-        """동기 데이터베이스 URL"""
-        return f"mysql+pymysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
+
+# 🔧 안전한 설정 초기화
+try:
+    settings = Settings()
+    settings.ensure_directories()
+    print(f"✅ 설정 로드 완료 (환경: {settings.ENVIRONMENT})")
     
-    @property
-    def async_database_url(self) -> str:
-        """비동기 데이터베이스 URL"""
-        return f"mysql+aiomysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
-
-
-settings = Settings()
-
-# 애플리케이션 시작 시 디렉토리 생성
-settings.ensure_directories()
+    if settings.is_database_configured():
+        print(f"✅ 데이터베이스 설정: {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
+    else:
+        print("⚠️  기본 데이터베이스 설정 사용 중 (.env.development 파일 확인 필요)")
+        
+except Exception as e:
+    print(f"❌ 설정 로드 실패: {e}")
+    print("🔧 환경변수 파일(.env.development)을 확인하세요")
+    # 에러 발생 시 앱 종료 (개발 중에는 문제를 명확히 해결하는 것이 중요)
+    raise
