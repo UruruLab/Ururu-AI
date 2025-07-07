@@ -4,7 +4,7 @@ Spring Boot와 공유하는 테이블들
 - Spring Boot에서 생성/관리하는 테이블들
 """
 from sqlalchemy import Column, String, Text, Integer, Boolean, ForeignKey, JSON, BigInteger, DateTime
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from .base import Base, BaseEntity
 
 class DBProduct(Base, BaseEntity):
@@ -81,6 +81,7 @@ class DBProductCategory(Base, BaseEntity):
     category_id = Column(BigInteger, ForeignKey("categories.id"), nullable=False)
     
     product = relationship("DBProduct", back_populates="product_categories")
+    category = relationship("DBCategory", back_populates="product_categories") 
 
 class DBProductNotice(Base, BaseEntity):
     """product_notices 테이블 매핑 - Spring Boot Entity와 완전 일치"""
@@ -109,3 +110,19 @@ class DBProductTag(Base, BaseEntity):
     tag_category_id = Column(BigInteger, ForeignKey("tag_category.id"), nullable=False)
     
     product = relationship("DBProduct", back_populates="product_tags")
+
+class DBCategory(Base, BaseEntity):
+    """categories 테이블"""
+    __tablename__ = "categories"
+    
+    name = Column(String(100), nullable=False, comment="카테고리명")
+    parent_id = Column(BigInteger, ForeignKey("categories.id"), nullable=True, comment="상위 카테고리 ID")
+    depth = Column(Integer, nullable=False, default=0, comment="카테고리 깊이 (0: 메인, 1: 서브, 2: 상세)")
+    order_index = Column(Integer, nullable=False, default=1, comment="정렬 순서")
+    path = Column(String(500), nullable=False, comment="카테고리 경로 (/1/2/3)")
+
+    children = relationship("DBCategory", backref=backref('parent', remote_side='DBCategory.id'))
+    product_categories = relationship("DBProductCategory", back_populates="category")
+    
+    def __repr__(self):
+        return f"<DBCategory(id={self.id}, name='{self.name}', depth={self.depth}, path='{self.path}')>"
