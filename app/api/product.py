@@ -164,4 +164,4 @@ async def generate_product_embedding(
         raise
     except Exception as e:
         logger.error(f"상품 임베딩 생성 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"임베딩 생성 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"임베딩 생성 실패: {str(e)}") from e

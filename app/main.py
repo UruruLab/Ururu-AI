@@ -1,6 +1,11 @@
 from fastapi import FastAPI
 from app.api import recommendations, admin, product
 from app.clients.spring_client import close_spring_client
+import logging
+from app.core.config import settings
+from app.core.database import init_database
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Ururu AI Recommendation API",
@@ -33,13 +38,14 @@ async def health_check():
 async def startup_event():
     """애플리케이션 시작 시 데이터베이스 초기화"""
     try:
-        from app.core.database import init_database
         await init_database()
-        print("데이터베이스 초기화 성공!")
+        logger.debug("데이터베이스 초기화 성공!")
     except Exception as e:
-        print(f"데이터베이스 초기화 실패: {e}")
-        # 개발 중에는 DB 없이도 실행되도록 (운영에서는 raise로 변경)
-        print("⚠️  데이터베이스 없이 계속 실행합니다...")
+        logger.error(f"데이터베이스 초기화 실패: {e}")
+        if settings.ENVIRONMENT == "production":
+            raise 
+        else:
+            logger.warning("⚠️  데이터베이스 없이 계속 실행합니다...")
 
 
 @app.on_event("shutdown")

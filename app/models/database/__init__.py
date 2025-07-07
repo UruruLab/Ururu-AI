@@ -28,7 +28,7 @@ __all__ = [
     "Base",
     # Spring Boot 모델들
     "DBProduct", "DBProductOption", "DBMember", "DBBeautyProfile",
-    "DBProductCategory", "DBProductNotice", "DBProductTag", "DBCategory"
+    "DBProductCategory", "DBProductNotice", "DBProductTag", "DBCategory",
     # AI 모델들
     "DBProductEmbedding", "DBRecommendationResult", "DBVectorIndex", "DBUserEmbedding",
     # 그룹

@@ -194,7 +194,7 @@ class Settings(BaseSettings):
     
     class Config:
         # 🔧 올바른 환경변수 파일 경로 설정
-        env_file = ".env.development"  # 실제 파일명과 일치
+        env_file = os.getenv("ENV_FILE_PATH", ".env.development")  # 실제 파일명과 일치
         env_file_encoding = "utf-8"
         case_sensitive = True
 

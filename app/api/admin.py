@@ -17,8 +17,6 @@ async def get_database_stats(
 ) -> Dict[str, Any]:
     """데이터베이스 통계 정보 (관리자용)"""
     try:
-        stats = {}
-        
         # Spring Boot 테이블들
         spring_tables = [
             ("products", "SELECT COUNT(*) FROM products"),
@@ -64,7 +62,7 @@ async def get_database_stats(
         
     except Exception as e:
         logger.error(f"통계 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"통계 조회 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"통계 조회 실패: {str(e)}") from e
 
 @router.get("/database/connection-test",
             summary="데이터베이스 연결 테스트",
@@ -87,4 +85,4 @@ async def test_database_connection(
         
     except Exception as e:
         logger.error(f"연결 테스트 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"연결 테스트 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"연결 테스트 실패: {str(e)}") from e

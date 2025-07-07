@@ -90,7 +90,6 @@ class ProductConverter:
         return Product(
             id=int(db_product.id),
             name=db_product.name,
-            brand="",
             description=db_product.description or "",
             ingredients=ingredients,
             category_main=category_main,

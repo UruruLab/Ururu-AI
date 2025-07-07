@@ -3,7 +3,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import text
-import asyncio
 from typing import AsyncGenerator
 import logging
 from app.core.config import settings
@@ -36,7 +35,7 @@ async_engine = create_async_engine(
     echo=settings.DEBUG
 )
 
-SesisonLocal = sessionmaker(
+SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
     bind=engine,
@@ -65,7 +64,7 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
 
 def get_sync_db():
     """동기 데이터베이스 세션 생성"""
-    db = SesisonLocal()
+    db = SessionLocal()
     try:
         yield db
     except Exception as e:
@@ -88,7 +87,7 @@ async def test_database_connection():
 
 async def check_required_tables():
     """필수 테이블 존재 여부 확인"""
-    required_tables = ['prouducts', 'product_options', 'beauty_profile', 'members']
+    required_tables = ['products', 'product_options', 'beauty_profile', 'members']
 
     try:
         async with async_engine.begin() as conn:
