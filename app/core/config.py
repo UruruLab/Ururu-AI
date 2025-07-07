@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # 로깅 설정 (환경변수에서만 가져옴)
     LOG_LEVEL: str
     LOG_FORMAT: str
-    
+
     # 상품 카테고리 설정 (고정값 - 비즈니스 로직)
     MAIN_CATEGORIES: List[str] = [
         "스킨케어", "메이크업", "클렌징", "마스크팩", 
@@ -85,6 +85,32 @@ class Settings(BaseSettings):
         "기미": "기미 미백",
         "잡티": "잡티 브라이트닝"
     }
+
+    # 데이터베이스 설정 (환경변수에서만 가져옴)
+    DB_HOST: str
+    DB_PORT: int = 3306
+    DB_USERNAME: str
+    DB_PASSWORD: str
+    DB_NAME: str
+    DB_CHARSET: str = "utf8mb4"
+    
+    # 데이터베이스 연결 풀 설정
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 0
+    DB_POOL_RECYCLE: int = 300
+    DB_POOL_PRE_PING: bool = True
+    
+    # AWS 설정 (S3 연동용)
+    AWS_REGION: str
+    AWS_ACCESS_KEY_ID: str
+    AWS_SECRET_ACCESS_KEY: str
+    S3_BUCKET_NAME: str
+    
+    # Vector DB 설정
+    VECTOR_INDEX_PATH: str = "data/faiss_index"
+    VECTOR_BACKUP_S3_PREFIX: str = "vector-indices"
+    
+
     
     # 파일 경로 설정 (동적 계산)
     @property
@@ -154,6 +180,16 @@ class Settings(BaseSettings):
         env_file = os.getenv("ENV_FILE_PATH", ".env")
         env_file_encoding = "utf-8"
         case_sensitive = True
+
+    @property
+    def database_url(self) -> str:
+        """동기 데이터베이스 URL"""
+        return f"mysql+pymysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
+    
+    @property
+    def async_database_url(self) -> str:
+        """비동기 데이터베이스 URL"""
+        return f"mysql+aiomysql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}?charset={self.DB_CHARSET}"
 
 
 settings = Settings()
