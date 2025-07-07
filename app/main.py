@@ -32,6 +32,7 @@ async def health_check():
 async def startup_event():
     """애플리케이션 시작 시 데이터베이스 초기화"""
     try:
+        from app.core.database import init_database
         await init_database()
         print("데이터베이스 초기화 성공!")
     except Exception as e:

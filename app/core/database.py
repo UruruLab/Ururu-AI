@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
 import asyncio
 from typing import AsyncGenerator
 import logging
@@ -78,7 +79,7 @@ async def test_database_connection():
     """데이터베이스 연결 테스트"""
     try:
         async with async_engine.begin() as conn:
-            result = await conn.execute("SELECT 1")
+            result = await conn.execute(text("SELECT 1"))
             logger.info("✅ 데이터베이스 연결 성공")
             return True
     except Exception as e:
@@ -91,7 +92,7 @@ async def check_required_tables():
 
     try:
         async with async_engine.begin() as conn:
-            from sqlalchemy import text
+            
 
             for table in required_tables:
                 result = await conn.execute(

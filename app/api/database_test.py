@@ -39,3 +39,38 @@ async def get_products(
     except Exception as e:
         logger.error(f"상품 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"데이터베이스 조회 실패: {str(e)}")
+    
+@router.get("/stats")
+async def get_database_stats(
+    db: AsyncSession = Depends(get_async_db)
+) -> Dict[str, Any]:
+    """데이터베이스 통계 정보"""
+    try:
+        stats = {}
+        
+        # 각 테이블별 데이터 수 조회
+        tables = [
+            ("products", "SELECT COUNT(*) FROM products"),
+            ("product_options", "SELECT COUNT(*) FROM product_options WHERE is_deleted = 0"),
+            ("members", "SELECT COUNT(*) FROM members WHERE is_deleted = 0"),
+            ("beauty_profile", "SELECT COUNT(*) FROM beauty_profile")
+        ]
+        
+        for table_name, query in tables:
+            try:
+                result = await db.execute(text(query))
+                count = result.scalar()
+                stats[table_name] = count
+            except Exception as e:
+                stats[table_name] = f"조회 실패: {str(e)}"
+        
+        logger.info("데이터베이스 통계 조회 완료")
+        return {
+            "status": "success",
+            "stats": stats,
+            "database_name": "ururu"
+        }
+        
+    except Exception as e:
+        logger.error(f"통계 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"통계 조회 실패: {str(e)}")
