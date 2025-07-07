@@ -73,7 +73,7 @@ class DBBeautyProfile(Base, BaseEntity):
     
     member = relationship("DBMember", back_populates="beauty_profile")
 
-class DBProductCategory(Base):
+class DBProductCategory(Base, BaseEntity):
     """product_categories 테이블 매핑"""
     __tablename__ = "product_categories"
     
@@ -82,7 +82,7 @@ class DBProductCategory(Base):
     
     product = relationship("DBProduct", back_populates="product_categories")
 
-class DBProductNotice(Base):
+class DBProductNotice(Base, BaseEntity):
     """product_notices 테이블 매핑 - Spring Boot Entity와 완전 일치"""
     __tablename__ = "product_notices"
     
@@ -101,7 +101,7 @@ class DBProductNotice(Base):
     
     product = relationship("DBProduct", back_populates="product_notice")
 
-class DBProductTag(Base):
+class DBProductTag(Base, BaseEntity):
     """productTags 테이블 매핑"""
     __tablename__ = "productTags"  
     
