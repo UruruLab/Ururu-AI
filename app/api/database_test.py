@@ -1,0 +1,41 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, text
+from typing import List, Dict, Any
+import logging
+
+from app.core.database import get_async_db
+from app.models.database import DBProduct, DBProductOption, DBMember, DBBeautyProfile
+
+router = APIRouter(prefix="/database", tags=["database"])
+logger = logging.getLogger(__name__)
+
+@router.get("/products")
+async def get_products(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_async_db)
+) -> List[Dict[str, Any]]:
+    """실제 데이터베이스에서 상품 조회"""
+    try:
+        # Spring Boot 테이블에서 실제 상품 데이터 조회
+        stmt = select(DBProduct).limit(limit)
+        result = await db.execute(stmt)
+        products = result.scalars().all()
+        
+        # 데이터 변환
+        product_list = []
+        for product in products:
+            product_list.append({
+                "id": product.id,
+                "name": product.name,
+                "description": product.description,
+                "status": product.status,
+                "created_at": product.created_at.isoformat() if product.created_at else None
+            })
+        
+        logger.info(f"상품 {len(product_list)}개 조회 완료")
+        return product_list
+        
+    except Exception as e:
+        logger.error(f"상품 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"데이터베이스 조회 실패: {str(e)}")
