@@ -24,7 +24,6 @@ class ProductCategory(str, Enum):
 
 class ProductBase(BaseModel):
     name: str = Field(..., description="상품명(시리즈명)")
-    brand: str = Field(..., description="브랜드명")
     description: str = Field(..., description="상품 설명")
     ingredients: Optional[str] = Field(None, description="성분 정보")
     category_main: ProductCategory = Field(..., description="상위 카테고리")
