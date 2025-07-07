@@ -95,8 +95,9 @@ async def check_required_tables():
 
             for table in required_tables:
                 result = await conn.execute(
-                    text(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '{settings.DB_NAME}' AND table_name = '{table}'")
-                    )
+                    text("SELECT COUNT(*) FROM informaion_schema.tables WHERE table_schema = :db_name AND table_name = :table_name"),
+                        {"db_name": settings.DB_NAME, "table_name": table}
+                )
                 count = result.scalar()
                 
                 if count > 0:
