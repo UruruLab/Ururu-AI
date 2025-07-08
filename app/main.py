@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.api import recommendations, admin, product
+from app.api import recommendations, admin, product, vector
 from app.clients.spring_client import close_spring_client
 import logging
 from app.core.config import settings
@@ -17,6 +17,7 @@ app = FastAPI(
 app.include_router(recommendations.router)
 app.include_router(admin.router)
 app.include_router(product.router)
+app.include_router(vector.router)
 
 @app.get("/")
 async def root():
