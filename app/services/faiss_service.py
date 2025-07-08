@@ -1,10 +1,10 @@
+# app/services/faiss_service.py - 1단계 수정 완료 버전
 import faiss
 import numpy as np
 import json
-import pickle
 import logging
 from pathlib import Path
-from typing import List, Dict, Tuple, Optional, Union
+from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -19,20 +19,23 @@ class FaissIndexManager:
     def __init__(self, dimension: int = settings.EMBEDDING_DIMENSION):
         self.dimension = dimension
         self.index = None
-        self.proudct_ids = []
+        self.product_ids = [] 
         self.metadata = {}
         self.index_type = settings.FAISS_INDEX_TYPE
         self.index_path = Path(settings.FAISS_INDEX_PATH)
         self.index_path.mkdir(parents=True, exist_ok=True)
 
-        self.executor = ThreadPoolExecutor(max_workers=settings.FAISS_THREAD_POOL_SIZE)
+        thread_pool_size = getattr(settings, 'FAISS_THREAD_POOL_SIZE', 2)
+        self.executor = ThreadPoolExecutor(max_workers=thread_pool_size)
 
-        logger.debug(f"Faiss 인덱스 매니저 초기화 - 차원: {dimension}, 인덱스 타입: {self.index_type}")
+        logger.info(f"🔍 Faiss 인덱스 매니저 초기화 - 차원: {dimension}, 인덱스 타입: {self.index_type}")
 
     def _create_index(self, index_type: str = None) -> faiss.Index:
         """Faiss 인덱스 생성"""
         if index_type is None:
             index_type = self.index_type
+
+        logger.debug(f"📊 Faiss 인덱스 생성: {index_type} (차원: {self.dimension})")
 
         if index_type == "IndexFlatIP":
             # 내적 기반 인덱스 - 코사인 유사도용
@@ -62,13 +65,13 @@ class FaissIndexManager:
         if not force_recreate and index_file.exists() and metadata_file.exists():
             try:
                 self._load_index()
-                logger.debug(f"기존 Faiss 인덱스 로드 완료: {len(self.product_ids)}개 벡터")
+                logger.info(f"✅ 기존 Faiss 인덱스 로드 완료: {len(self.product_ids)}개 벡터")
                 return
             except Exception as e:
                 logger.warning(f"기존 인덱스 로드 실패: {e}, 인덱스 재생성 필요")
 
         self.index = self._create_index()
-        self.proudct_ids = []
+        self.product_ids = []  
         self.metadata = {
             "created_at": datetime.now().isoformat(),
             "index_type": self.index_type,
@@ -76,55 +79,84 @@ class FaissIndexManager:
             "total_vectors": 0
         }
 
-        logger.debug("새 Faiss 인덱스 생성 완료")
+        logger.info("🆕 새 Faiss 인덱스 생성 완료")
 
-    def add_vectors(self, vectors:np.ndarray, product_ids: List[int], batch_metadate: Dict = None):
+    def add_vectors(self, vectors: np.ndarray, product_ids: List[int], batch_metadata: Dict = None):  
         """벡터들을 인덱스에 추가"""
         if self.index is None:
             raise ValueError("인덱스가 초기화되지 않았습니다.")
         if len(vectors) != len(product_ids):
             raise ValueError("벡터와 제품 ID의 길이가 일치하지 않습니다.")
-        if self.index_type == "IndexIVFFlat" :
+
+        if self.index_type == "IndexFlatIP":  
             vectors = self._normalize_vectors(vectors)
 
-        start_idx = len(self.proudct_ids)
+        start_idx = len(self.product_ids) 
         self.index.add(vectors.astype(np.float32))
-        self.proudct_ids.extend(product_ids)
+        self.product_ids.extend(product_ids)  
 
-        self.metadata["total_vectors"] = len(self.proudct_ids)
+        self.metadata["total_vectors"] = len(self.product_ids) 
         self.metadata["last_updated"] = datetime.now().isoformat()
 
-        if batch_metadate:
-            self.metadata.update(batch_metadate)
+        if batch_metadata: 
+            self.metadata.update(batch_metadata)
 
-        logger.debug(f"{len(vectors)}개의 벡터를 인덱스에 추가했습니다. 현재 총 {len(self.proudct_ids)}개 벡터")
+        logger.info(f"➕ 벡터 추가 완료: {len(vectors)}개 (총 {len(self.product_ids)}개)")
 
         return start_idx, start_idx + len(vectors)
     
     def search(self, query_vector: np.ndarray, k: int = 10) -> Tuple[List[float], List[int]]:
         """벡터 검색"""
-        if self.index is None or len(self.proudct_ids) == 0:
+        if self.index is None or len(self.product_ids) == 0:
             logger.warning("빈 인덱스에서 검색 요청")
-            return [],[]
+            return [], []
         
-        if self.index_typ == "IndexFlatIP":
+        if self.index_type == "IndexFlatIP":
             query_vector = self._normalize_vectors(query_vector.reshape(1, -1))
         else:
             query_vector = query_vector.reshape(1, -1)
 
-        k = min(k, len(self.proudct_ids))
+        k = min(k, len(self.product_ids))  
         scores, indices = self.index.search(query_vector.astype(np.float32), k)
         scores = scores[0].tolist()
-        product_ids = [self.proudct_ids[idx] for idx in indices[0] if idx < len(self.proudct_ids)]
+        product_ids = [self.product_ids[idx] for idx in indices[0] if idx < len(self.product_ids)]  
 
-        logger.debug(f"벡터 검색 완료: top-{k}, 최고 점수: {scores[0]:.4f}")
+        logger.debug(f"🔍 벡터 검색 완료: top-{k}, 최고 점수: {scores[0]:.4f}")
 
         return scores, product_ids
+    
+   
+    def search_raw(self, query_vector: np.ndarray, k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
+        """원시 벡터 검색 - Faiss 점수와 인덱스만 반환"""
+        if self.index is None or len(self.product_ids) == 0:
+            logger.warning("빈 인덱스에서 검색 요청")
+            return np.array([]), np.array([])
+
+        if self.index_type == "IndexFlatIP":
+            query_vector = self._normalize_vectors(query_vector.reshape(1, -1))
+        else:
+            query_vector = query_vector.reshape(1, -1)
+
+        k = min(k, len(self.product_ids))
+        scores, indices = self.index.search(query_vector.astype(np.float32), k)
+
+        logger.debug(f"🔍 원시 벡터 검색 완료: top-{k}")
+
+        return scores[0], indices[0]
     
     async def search_async(self, query_vector: np.ndarray, k: int = 10) -> Tuple[List[float], List[int]]:
         """비동기 벡터 검색"""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(self.executor, self.search, query_vector, k)
+    
+    async def search_raw_async(self, query_vector: np.ndarray, k: int = 10) -> Tuple[np.ndarray, np.ndarray]:
+        """비동기 원시 벡터 검색"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(self.executor, self.search_raw, query_vector, k)
+    
+    def get_product_ids_by_indices(self, indices: np.ndarray) -> List[int]:
+        """인덱스를 상품 ID로 변환"""
+        return [self.product_ids[idx] for idx in indices if idx < len(self.product_ids)]
     
     def _normalize_vectors(self, vectors: np.ndarray) -> np.ndarray:
         """벡터 정규화 (코사인 유사도용)"""
@@ -153,7 +185,7 @@ class FaissIndexManager:
             logger.debug(f"💾 Faiss 인덱스 저장 완료: {index_file}")
             
         except Exception as e:
-            logger.warning(f"인덱스 저장 실패: {e}")
+            logger.error(f"인덱스 저장 실패: {e}")
             raise
     
     def _load_index(self):
@@ -195,7 +227,7 @@ class FaissIndexManager:
         self.product_ids = []
         self.add_vectors(old_vectors, remaining_product_ids)
         
-        logger.debug(f"🗑️ 벡터 제거 완료: {len(product_ids_to_remove)}개 제거, {len(remaining_product_ids)}개 유지")
+        logger.info(f"🗑️ 벡터 제거 완료: {len(product_ids_to_remove)}개 제거, {len(remaining_product_ids)}개 유지")
 
     def get_index_stats(self) -> Dict:
         """인덱스 통계 정보"""
@@ -219,15 +251,15 @@ class FaissIndexManager:
         
     
 class FaissVectorStore:
-    """Faiss 벡터 서비스"""
+    """Faiss 벡터 저장소 - 수정 완료"""
     
     def __init__(self):
         self.index_manager = FaissIndexManager()
         self.index_manager.initialize_index()
-        logger.info("🚀 Faiss 벡터 서비스 초기화 완료")
+        logger.info("🚀 Faiss 벡터 저장소 초기화 완료")
     
-    async def add_product_embeddings(self, embeddings_data: List[Dict]) -> bool:
-        """상품 임베딩들을 벡터 저장소에 추가"""
+    async def add_embeddings(self, embeddings_data: List[Dict]) -> bool: 
+        """임베딩 데이터를 저장소에 추가"""
         try:
             if not embeddings_data:
                 logger.warning("추가할 임베딩 데이터가 없습니다")
@@ -257,15 +289,15 @@ class FaissVectorStore:
                 self.index_manager.save_index
             )
             
-            logger.info(f"상품 임베딩 추가 완료: {len(embeddings_data)}개")
+            logger.info(f"✅ 임베딩 저장 완료: {len(embeddings_data)}개")
             return True
             
         except Exception as e:
-            logger.error(f"상품 임베딩 추가 실패: {e}")
+            logger.error(f"임베딩 저장 실패: {e}")
             return False
     
     async def search_vectors(self, query_embedding: List[float], k: int = 10) -> Tuple[List[float], List[int]]:
-        """순수 벡터 검색"""
+        """순수 벡터 검색 - 원시 점수와 상품 ID만 반환"""
         try:
             query_vector = np.array(query_embedding)
             scores, indices = await self.index_manager.search_raw_async(query_vector, k)
@@ -280,23 +312,22 @@ class FaissVectorStore:
             logger.error(f"벡터 검색 실패: {e}")
             return [], []
     
-    def get_service_stats(self) -> Dict:
-        """서비스 통계 정보"""
+    def get_store_stats(self) -> Dict:  
+        """저장소 통계"""
         return {
-            "service_name": "FaissVectorService",
+            "store_name": "FaissVectorStore",
             "index_stats": self.index_manager.get_index_stats(),
             "settings": {
                 "embedding_dimension": settings.EMBEDDING_DIMENSION,
                 "index_type": settings.FAISS_INDEX_TYPE,
-                "min_similarity_threshold": settings.MIN_SIMILARITY_THRESHOLD,
-                "max_similarity_threshold": settings.MAX_SIMILARITY_THRESHOLD
+                "min_similarity_threshold": getattr(settings, 'MIN_SIMILARITY_THRESHOLD', 0.3),
+                "max_similarity_threshold": getattr(settings, 'MAX_SIMILARITY_THRESHOLD', 1.0)
             }
         }
     
     async def close(self):
-        """서비스 종료"""
+        """저장소 종료"""
         if hasattr(self.index_manager, 'executor'):
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self.index_manager.close)
-        logger.info("🔒 Faiss 벡터 서비스 종료")
-
+        logger.info("🔒 Faiss 벡터 저장소 종료")
