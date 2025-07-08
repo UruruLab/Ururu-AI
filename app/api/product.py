@@ -174,3 +174,88 @@ async def get_product_service_status(
         logger.error(f"상품 서비스 상태 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"서비스 상태 조회 실패: {str(e)}")
     
+@router.get("/embedding/verify/{product_id}",
+            summary="개별 상품 추천 가능 여부 확인",
+            description="""
+            **상품별 추천 등록 상태 확인 API** - 특정 상품이 추천 시스템에 등록되어 있는지 확인합니다.
+            
+            ## 사용 시나리오:
+            1. **상품 등록 확인**: 새로 추가한 상품이 추천 시스템에 반영되었는지 확인
+            2. **문제 진단**: 특정 상품이 추천 결과에 나오지 않을 때 원인 파악  
+            3. **품질 검증**: 상품의 임베딩이 적절하게 생성되었는지 유사도 테스트
+            
+            ## 반환 정보:
+            - 해당 상품의 추천 시스템 등록 여부
+            - 유사한 상품과의 관계 (유사도 점수)
+            - 추천 결과에서의 예상 순위
+            """)
+async def verify_product_embedding(
+    product_id: int,
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """개별 상품의 추천 시스템 등록 상태 및 품질 확인"""
+    try:
+        # 상품 존재 여부 확인
+        stmt = select(DBProduct).where(DBProduct.id == product_id)
+        result = await db.execute(stmt)
+        db_product = result.scalar_one_or_none()
+        
+        if not db_product:
+            raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
+        
+        # 벡터 저장소에서 확인 (상품 이름으로 검색해서 자기 자신이 나오는지 테스트)
+        test_embedding = recommendation_service.embedding_service.encode_text(db_product.name)
+        scores, product_ids = await recommendation_service.vector_store.search_vectors(test_embedding, k=10)
+        
+        is_indexed = product_id in product_ids
+        similarity_score = None
+        search_rank = None
+        
+        if is_indexed:
+            # 해당 상품의 유사도 점수와 순위 찾기
+            for i, (score, pid) in enumerate(zip(scores, product_ids)):
+                if pid == product_id:
+                    similarity_score = score
+                    search_rank = i + 1
+                    break
+        
+        # 전체 벡터 저장소 상태
+        vector_stats = recommendation_service.vector_store.get_store_stats()
+        
+        return {
+            "product_id": product_id,
+            "product_name": db_product.name,
+            "recommendation_status": {
+                "is_indexed": is_indexed,
+                "can_be_recommended": is_indexed,
+                "recommendation_ready": is_indexed
+            },
+            "quality_metrics": {
+                "self_similarity_score": similarity_score,
+                "search_rank_for_own_name": search_rank,
+                "quality_assessment": "excellent" if similarity_score and similarity_score > 0.9 else
+                                   "good" if similarity_score and similarity_score > 0.7 else
+                                   "fair" if similarity_score and similarity_score > 0.5 else "poor"
+            } if is_indexed else None,
+            "similar_products": [
+                {"product_id": pid, "similarity": score} 
+                for pid, score in zip(product_ids[:5], scores[:5]) 
+                if pid != product_id
+            ] if is_indexed else [],
+            "system_context": {
+                "total_indexed_products": vector_stats["index_stats"]["total_vectors"],
+                "index_type": vector_stats["index_stats"]["index_type"],
+                "embedding_dimension": vector_stats["settings"]["embedding_dimension"]
+            },
+            "next_steps": [
+                "상품이 추천 시스템에 등록되어 있습니다" if is_indexed else 
+                "POST /products/embedding/generate 를 사용하여 이 상품을 추천 시스템에 등록하세요"
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"임베딩 검증 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"임베딩 검증 실패: {str(e)}")
