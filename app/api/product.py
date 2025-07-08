@@ -11,12 +11,13 @@ from app.models.product import (
     ProductRecommendationResponse, RecommendedProduct,
     ProductCategory
 )
+from app.services.recommendation_service import RecommendationService
 from app.services.product_tower_service import ProductTowerService
 from app.services.product_converter import ProductConverter, get_product_converter
+from app.core.dependencies import get_recommendation_service
 from app.core.dependencies import get_product_tower_service
 from app.models.database import DBProduct
 from app.core.database import get_async_db
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/products", tags=["products"])
@@ -110,10 +111,12 @@ async def recommend_products(
         raise HTTPException(status_code=500, detail="상품 추천에 실패했습니다.")
 
 
-@router.post("/embedding/generate")
+@router.post("/embedding/generate",
+             summary="상품 임베딩 생성",
+             description="상품 ID를 기반으로 상품 임베딩을 생성합니다. ")
 async def generate_product_embedding(
     product_id: int,
-    product_service: ProductTowerService = Depends(get_product_tower_service),
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
     converter: ProductConverter = Depends(get_product_converter),
     db: AsyncSession = Depends(get_async_db)
 ):
@@ -134,30 +137,42 @@ async def generate_product_embedding(
             raise HTTPException(status_code=404, detail="상품을 찾을 수 없습니다.")
         
         product = await converter.db_to_pydantic(db, db_product)
-        processed_text = product_service.preprocess_product_text(product)
+        processed_text = recommendation_service.product_tower_service.preprocess_product_text(product)
         
         # 임베딩 벡터 생성
-        embedding_vector = product_service.embedding_service.encode_text(processed_text)
+        embedding_vector = recommendation_service.embedding_service.encode_text(processed_text)
         
         embedding_dimension = len(embedding_vector)
         logger.info(f"임베딩 생성 완료 - 차원: {embedding_dimension}, 텍스트 길이: {len(processed_text)}")
         
-        # TODO: 생성된 임베딩을 DB 또는 Faiss 인덱스에 저장
-        # await save_product_embedding_to_db(product_id, embedding_vector, processed_text)
-        
+        success = await recommendation_service.vector_store.add_embeddings([{
+            "product_id": product_id,
+            "embedding": embedding_vector,
+            "metadata": {
+                "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "processed_text": processed_text[:200]
+            }
+        }])
+
+        if not success:
+            raise HTTPException(status_code=500, detail="벡터 저장소 추가 실패")
+
         return {
             "success": True,
-            "message": f"상품 {product_id}({product.name})의 임베딩이 생성되었습니다.",
-            "product_name": product.name,
-            "category": f"{product.category_main.value} > {product.category_sub}",
-            "processed_text": processed_text[:100] + "..." if len(processed_text) > 100 else processed_text,
-            "embedding_dimension": embedding_dimension,
-            "text_length": len(processed_text),
-            "model_version": product_service.embedding_service.get_model_info().get("model_name", "KoSBERT-v1"),
-            "embedding_sample": embedding_vector[:5],  # 처음 5개 값만 샘플로 표시
-            "base_price": float(product.base_price),
-            "has_ingredients": bool(product.ingredients),
-            "category_source": "database"  # 실제 DB에서 조회했음을 표시
+            "message": f"상품 {product_id}({product.name})의 임베딩이 생성되었습니다",
+            "product_info": {
+                "id": product.id,
+                "name": product.name,
+                "category": f"{product.category_main.value} > {product.category_sub}",
+                "base_price": float(product.base_price)
+            },
+            "embedding_info": {
+                "dimension": len(embedding_vector),
+                "text_length": len(processed_text),
+                "model_version": recommendation_service.embedding_service.get_model_info().get("model_name"),
+                "vector_store_added": success,
+                "sample_values": embedding_vector[:5]
+            }
         }
         
     except HTTPException:
@@ -165,3 +180,66 @@ async def generate_product_embedding(
     except Exception as e:
         logger.error(f"상품 임베딩 생성 실패: {e}")
         raise HTTPException(status_code=500, detail=f"임베딩 생성 실패: {str(e)}") from e
+    
+    
+@router.get("/service/status",
+            summary="상품 서비스 상태",
+            description="상품 관리 서비스의 상태와 통계를 조회합니다")
+async def get_product_service_status(
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """상품 서비스 상태 조회"""
+    try:
+        from sqlalchemy import func
+        from app.models.database import DBProductOption
+        
+        # 기본 상품 통계
+        active_products_stmt = select(func.count(DBProduct.id)).where(DBProduct.status == "ACTIVE")
+        active_result = await db.execute(active_products_stmt)
+        active_products = active_result.scalar() or 0
+        
+        total_products_stmt = select(func.count(DBProduct.id))
+        total_result = await db.execute(total_products_stmt)
+        total_products = total_result.scalar() or 0
+        
+        # 상품 옵션 통계
+        active_options_stmt = select(func.count(DBProductOption.id)).where(DBProductOption.is_deleted == False)
+        options_result = await db.execute(active_options_stmt)
+        active_options = options_result.scalar() or 0
+        
+        # 추천 서비스 통계
+        recommendation_stats = recommendation_service.get_recommendation_stats()
+        
+        return {
+            "timestamp": "2025-01-01T00:00:00",
+            "service_status": "healthy",
+            "product_statistics": {
+                "total_products": total_products,
+                "active_products": active_products,
+                "inactive_products": total_products - active_products,
+                "active_options": active_options,
+                "average_options_per_product": round(active_options / max(active_products, 1), 2)
+            },
+            "recommendation_integration": {
+                "service_connected": True,
+                "vector_store_ready": recommendation_stats["vector_store_stats"]["index_stats"]["status"] == "ready",
+                "embedding_model": recommendation_stats["embedding_model"]["model_name"],
+                "total_vectors": recommendation_stats["vector_store_stats"]["index_stats"]["total_vectors"]
+            },
+            "capabilities": {
+                "individual_embedding_generation": True,
+                "product_text_preprocessing": True,
+                "category_mapping": True,
+                "price_analysis": True
+            },
+            "api_endpoints": {
+                "generate_embedding": "/products/embedding/generate",
+                "service_status": "/products/service/status"
+            },
+            "note": "추천 기능은 /api/recommendations에서 제공됩니다"
+        }
+        
+    except Exception as e:
+        logger.error(f"상품 서비스 상태 조회 실패: {e}")
+        raise HTTPException(status_code=500, detail=f"서비스 상태 조회 실패: {str(e)}")
