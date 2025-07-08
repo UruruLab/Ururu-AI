@@ -109,6 +109,9 @@ class Settings(BaseSettings):
     # Vector DB 설정
     VECTOR_INDEX_PATH: str = "data/faiss_index"
     VECTOR_BACKUP_S3_PREFIX: str = "vector-indices"
+
+    # Faiss 설정
+    FAISS_THREAD_POOL_SIZE: int = 2
     
     # 파일 경로 설정 (동적 계산)
     @property
