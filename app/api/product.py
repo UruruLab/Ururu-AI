@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 import logging
 import time
@@ -98,9 +98,22 @@ async def generate_product_embedding(
         raise HTTPException(status_code=500, detail=f"임베딩 생성 실패: {str(e)}") from e
     
     
-@router.get("/service/status",
-            summary="상품 서비스 상태",
-            description="상품 관리 서비스의 상태와 통계를 조회합니다")
+@router.get("/recommendation-readiness",
+            summary="추천 시스템 준비 상태 확인",
+            description="""
+            **추천 시스템 상태 점검 API** - 사용자 추천 요청 전에 시스템이 준비되었는지 확인합니다.
+            
+            ## 사용 시나리오:
+            1. **시스템 점검**: 추천 API 호출 전 시스템 상태 확인
+            2. **관리자 모니터링**: 얼마나 많은 상품이 추천 가능한 상태인지 확인
+            3. **디버깅**: 추천 결과가 적게 나올 때 원인 파악
+            
+            ## 반환 정보:
+            - 임베딩이 생성된 상품 수
+            - 전체 활성 상품 수 대비 커버리지
+            - 추천 시스템 구성 요소별 상태
+            - 예상 추천 품질 수준
+            """)
 async def get_product_service_status(
     recommendation_service: RecommendationService = Depends(get_recommendation_service),
     db: AsyncSession = Depends(get_async_db)
@@ -126,6 +139,10 @@ async def get_product_service_status(
         
         # 추천 서비스 통계
         recommendation_stats = recommendation_service.get_recommendation_stats()
+
+        # 벡터 저장소 통계
+        vector_stats = recommendation_service.vector_store.get_store_stats()
+        indexed_products = vector_stats["index_stats"]["total_vectors"]
         
         return {
             "timestamp": "2025-01-01T00:00:00",
@@ -140,6 +157,8 @@ async def get_product_service_status(
             "recommendation_integration": {
                 "service_connected": True,
                 "vector_store_ready": recommendation_stats["vector_store_stats"]["index_stats"]["status"] == "ready",
+                "database_connection": "active",
+                "index_type": vector_stats["index_stats"]["index_type"],
                 "embedding_model": recommendation_stats["embedding_model"]["model_name"],
                 "total_vectors": recommendation_stats["vector_store_stats"]["index_stats"]["total_vectors"]
             },
@@ -148,14 +167,10 @@ async def get_product_service_status(
                 "product_text_preprocessing": True,
                 "category_mapping": True,
                 "price_analysis": True
-            },
-            "api_endpoints": {
-                "generate_embedding": "/products/embedding/generate",
-                "service_status": "/products/service/status"
-            },
-            "note": "추천 기능은 /api/recommendations에서 제공됩니다"
+            }
         }
         
     except Exception as e:
         logger.error(f"상품 서비스 상태 조회 실패: {e}")
         raise HTTPException(status_code=500, detail=f"서비스 상태 조회 실패: {str(e)}")
+    
