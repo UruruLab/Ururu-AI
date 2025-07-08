@@ -14,7 +14,7 @@ from app.core.database import get_async_db
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/vector", tags=["vector-admin"])
+router = APIRouter(prefix="/api/vector", tags=["vector-admin"])
 
 
 @router.get("/status",

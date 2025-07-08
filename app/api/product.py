@@ -13,7 +13,7 @@ from app.models.database import DBProduct
 from app.core.database import get_async_db
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/api/products", tags=["products"])
 
 
 @router.post("/embedding/generate",

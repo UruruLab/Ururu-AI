@@ -1,19 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from typing import List, Optional, Dict, Any
 import logging
+import time
 
-# TODO: 팀원이 구현할 모델들은 일단 주석처리
-# from app.models.recommendation import (
-#     RecommendationRequest,
-#     RecommendationResponse,
-#     RecommendationItem,
-#     RecommendationMetadata
-# )
-# from app.services.recommendation_service import get_recommendation_service, RecommendationService
+from app.services.recommendation_service import RecommendationService
 from app.clients.spring_client import get_spring_client, SpringBootClient
+from app.models.product import (
+    ProductRecommendationRequest, 
+    ProductRecommendationResponse,
+    RecommendedProduct
+)
+from app.core.dependencies import get_recommendation_service
+from app.core.database import get_async_db
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 logger = logging.getLogger(__name__)
+
+
+
+
+
+
+
+
 
 
 @router.get("/health")
@@ -47,18 +57,6 @@ async def check_spring_boot_connection(
             "spring_boot_connection": "unhealthy",
             "error": str(e)
         }
-
-
-# TODO: 추천 API는 팀원의 DB/임베딩 구현 후 활성화
-# @router.post("/", response_model=RecommendationResponse)
-# async def get_recommendations(
-#     request: RecommendationRequest,
-#     background_tasks: BackgroundTasks,
-#     recommendation_service: RecommendationService = Depends(get_recommendation_service),
-#     spring_client: SpringBootClient = Depends(get_spring_client)
-# ) -> RecommendationResponse:
-#     """메인 추천 API 엔드포인트 - 팀원 구현 대기"""
-#     pass
 
 
 @router.post("/test-spring-notify")
