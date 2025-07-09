@@ -7,7 +7,8 @@ import time
 from typing import List
 
 from app.services.recommendation_service import RecommendationService
-from app.services.product_converter import ProductConverter, get_product_converter
+from app.core.dependencies import get_product_converter  
+from app.services.product_converter import ProductConverter 
 from app.core.dependencies import get_recommendation_service
 from app.models.database import DBProduct
 from app.core.database import get_async_db
