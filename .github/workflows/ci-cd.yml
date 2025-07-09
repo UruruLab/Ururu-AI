@@ -26,12 +26,12 @@ jobs:
       uses: actions/checkout@v4
       
     - name: Python 환경 설정
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
     - name: 의존성 캐시
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
