@@ -50,7 +50,7 @@ jobs:
       run: |
         # 중요한 구문 오류만 체크
         flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics --exit-zero
-        echo "✅ 코드 품질 검사 완료"
+        echo "코드 품질 검사 완료"
         
     - name: 테스트 실행
       run: |
@@ -118,18 +118,18 @@ jobs:
         
     - name: Docker Compose 설정 검증
       run: |
-        echo "✅ 개발 환경 설정 파일 검증"
-        echo "✅ docker-compose.development.yml 구문 검증"
+        echo "개발 환경 설정 파일 검증"
+        echo "docker-compose.development.yml 구문 검증"
         docker compose -f docker-compose.development.yml config --quiet
-        echo "✅ 개발 환경 배포 준비 완료"
+        echo "개발 환경 배포 준비 완료"
         
     - name: 배포 시뮬레이션 (실제 EC2 배포 없음)
       run: |
-        echo "🚀 개발 환경 배포 시뮬레이션"
+        echo "개발 환경 배포 시뮬레이션"
         echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        echo "- Spring Boot URL: ${{ secrets.DEV_SPRING_BACKEND_URL }}"
-        echo "- Redis URL: ${{ secrets.DEV_REDIS_URL }}"
-        echo "✅ 개발 환경 배포 설정 완료"
+        echo "- Spring Boot URL: [MASKED]"
+        echo "- Redis URL: [MASKED]"
+        echo "개발 환경 배포 설정 완료"
 
   deploy-production:
     needs: build-and-push
@@ -148,22 +148,22 @@ jobs:
         
     - name: Docker Compose 설정 검증
       run: |
-        echo "✅ 운영 환경 설정 파일 검증"
-        echo "✅ docker-compose.production.yml 구문 검증"
+        echo "운영 환경 설정 파일 검증"
+        echo "docker-compose.production.yml 구문 검증"
         docker compose -f docker-compose.production.yml config --quiet
-        echo "✅ 운영 환경 배포 준비 완료"
+        echo "운영 환경 배포 준비 완료"
         
     - name: 배포 알림 준비
       run: |
-        echo "🚀 운영 환경 배포 준비 완료"
+        echo "운영 환경 배포 준비 완료"
         echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        echo "- Spring Boot URL: ${{ secrets.PROD_SPRING_BACKEND_URL }}"
+        echo "- Spring Boot URL: [MASKED]"
         echo "- Redis URL: [MASKED]"
-        echo "📋 실제 EC2 배포는 별도 프로세스에서 진행"
+        echo "실제 EC2 배포는 별도 프로세스에서 진행"
         
     - name: 배포 완료 알림
       if: success()
       run: |
-        echo "✅ GitHub Actions 배포 파이프라인이 성공적으로 완료되었습니다."
-        echo "📦 Docker 이미지가 GitHub Container Registry에 푸시되었습니다."
-        echo "🔧 EC2 서버에서 수동으로 docker compose pull && docker compose up -d 실행이 필요합니다."
+        echo "GitHub Actions 배포 파이프라인이 성공적으로 완료되었습니다."
+        echo "Docker 이미지가 GitHub Container Registry에 푸시되었습니다."
+        echo "EC2 서버에서 수동으로 docker compose pull && docker compose up -d 실행이 필요합니다."
