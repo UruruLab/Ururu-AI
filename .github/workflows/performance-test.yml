@@ -153,7 +153,7 @@ jobs:
         echo "- 테스트 대상: Mock FastAPI 서버"
         
     - name: 결과 파일 업로드
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: performance-test-results-${{ github.run_number }}
