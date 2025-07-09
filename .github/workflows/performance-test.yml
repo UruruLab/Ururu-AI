@@ -29,7 +29,7 @@ jobs:
         
     - name: 성능 테스트 도구 설치
       run: |
-        pip install locust requests fastapi uvicorn
+        pip install locust==2.31.0 requests==2.32.3 fastapi==0.111.0 uvicorn==0.30.0
         
     - name: 테스트용 FastAPI 서버 시작
       run: |

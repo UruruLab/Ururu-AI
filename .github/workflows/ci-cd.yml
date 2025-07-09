@@ -119,7 +119,6 @@ jobs:
     - name: Docker Compose 설정 검증
       run: |
         echo "✅ 개발 환경 설정 파일 검증"
-        cat .env.development
         echo "✅ docker-compose.development.yml 구문 검증"
         docker compose -f docker-compose.development.yml config --quiet
         echo "✅ 개발 환경 배포 준비 완료"
@@ -150,7 +149,6 @@ jobs:
     - name: Docker Compose 설정 검증
       run: |
         echo "✅ 운영 환경 설정 파일 검증"
-        cat .env.production
         echo "✅ docker-compose.production.yml 구문 검증"
         docker compose -f docker-compose.production.yml config --quiet
         echo "✅ 운영 환경 배포 준비 완료"
