@@ -11,6 +11,8 @@ from app.services.recommendation_service import RecommendationService
 from app.core.dependencies import get_vector_store, get_recommendation_service
 from app.models.database import DBProduct, DBProductEmbedding
 from app.core.database import get_async_db
+from app.core.database import AsyncSessionLocal
+from sqlalchemy.orm import selectinload
 
 
 logger = logging.getLogger(__name__)
@@ -36,7 +38,6 @@ async def get_vector_status(
         
         db_embeddings_stmt = select(func.count(DBProductEmbedding.id))
         db_result = await db.execute(db_embeddings_stmt)
-        db_embedding_count = db_result.scalar() or 0
         
         return {
             "timestamp": datetime.now().isoformat(),
@@ -107,9 +108,6 @@ async def generate_batch_embeddings(
 
 async def _process_batch_embeddings(force_recreate: bool, batch_size: int):
     """배치 임베딩 처리 - 간소화 버전"""
-    from app.core.database import AsyncSessionLocal
-    from app.core.dependencies import get_recommendation_service
-    from sqlalchemy.orm import selectinload
     
     logger.info(f"🔄 배치 임베딩 처리 시작: {batch_size}개씩")
     

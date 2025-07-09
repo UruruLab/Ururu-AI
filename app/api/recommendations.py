@@ -119,7 +119,7 @@ async def get_product_recommendations(
         
     except Exception as e:
         logger.error(f"❌ 상품 추천 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"상품 추천에 실패했습니다: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"상품 추천에 실패했습니다: {str(e)}") from e
 
 
 

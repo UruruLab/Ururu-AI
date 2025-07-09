@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 import logging
 import time
 from typing import List
+from datetime import datetime
 
 from app.services.recommendation_service import RecommendationService
 from app.core.dependencies import get_product_converter  
@@ -146,7 +147,7 @@ async def get_product_service_status(
         indexed_products = vector_stats["index_stats"]["total_vectors"]
         
         return {
-            "timestamp": "2025-01-01T00:00:00",
+            "timestamp": datetime.now().isoformat(),
             "service_status": "healthy",
             "product_statistics": {
                 "total_products": total_products,
@@ -173,7 +174,7 @@ async def get_product_service_status(
         
     except Exception as e:
         logger.error(f"상품 서비스 상태 조회 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"서비스 상태 조회 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"서비스 상태 조회 실패: {str(e)}") from e
     
 @router.get("/embedding/verify/{product_id}",
             summary="개별 상품 추천 가능 여부 확인",
@@ -259,4 +260,4 @@ async def verify_product_embedding(
         raise
     except Exception as e:
         logger.error(f"임베딩 검증 실패: {e}")
-        raise HTTPException(status_code=500, detail=f"임베딩 검증 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"임베딩 검증 실패: {str(e)}") from e
