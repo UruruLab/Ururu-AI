@@ -101,12 +101,21 @@ class RecommendationService:
         product_details: Dict[int, Dict[str, Any]],
         request: ProfileBasedRecommendationRequest
     ) -> List[Dict[str, Any]]:
-        """프로필 기반 추천 생성"""
+        """프로필 기반 추천 생성 - 디버깅 강화"""
         
         recommendations = []
+        debug_stats = {
+            "total_candidates": len(all_product_ids),
+            "similarity_filtered": 0,
+            "price_filtered": 0,
+            "final_recommendations": 0
+        }
+        
+        logger.info(f"🔍 추천 생성 시작: {len(all_product_ids)}개 후보, {len(product_details)}개 상세정보")
         
         for i, (raw_score, product_id) in enumerate(zip(raw_scores, all_product_ids)):
             if product_id not in product_details:
+                logger.debug(f"상품 {product_id}: 상세정보 없음")
                 continue
             
             details = product_details[product_id]
@@ -114,16 +123,23 @@ class RecommendationService:
             
             # 1. Faiss 점수를 유사도로 변환
             similarity_score = self._convert_faiss_score_to_similarity(raw_score)
+            logger.debug(f"상품 {product_id} ({product.name[:20]}): 원시점수={raw_score:.4f}, 유사도={similarity_score:.4f}")
             
             # 2. 최소 유사도 임계값 체크
             min_threshold = request.min_similarity or settings.MIN_SIMILARITY_THRESHOLD
             if similarity_score < min_threshold:
                 logger.debug(f"상품 {product_id} 유사도 임계값 미달: {similarity_score:.3f} < {min_threshold}")
+                debug_stats["similarity_filtered"] += 1
                 continue
             
             # 3. 가격 필터 적용 (프로필 기반)
-            if not self._passes_price_filter(product, request.beauty_profile, request.use_price_filter):
-                logger.debug(f"상품 {product_id} 가격 필터 실패")
+            product_price = float(product.base_price)
+            price_check = self._passes_price_filter(product, request.beauty_profile, request.use_price_filter)
+            logger.debug(f"상품 {product_id} 가격체크: {product_price}원, 범위({request.beauty_profile.min_price}-{request.beauty_profile.max_price}), 통과={price_check}")
+            
+            if not price_check:
+                logger.debug(f"상품 {product_id} 가격 필터 실패: {product_price}원")
+                debug_stats["price_filtered"] += 1
                 continue
             
             # 4. 프로필-상품 매칭 점수 계산
@@ -168,7 +184,14 @@ class RecommendationService:
                 "recommendation_method": "profile_based"
             })
             
-            logger.debug(f"✅ 상품 {product_id} 프로필 추천 (유사도: {similarity_score:.3f}, 매칭: {profile_match_score:.3f})")
+            debug_stats["final_recommendations"] += 1
+            logger.debug(f"✅ 상품 {product_id} 추천 성공 (유사도: {similarity_score:.3f}, 매칭: {profile_match_score:.3f}, 최종: {final_score:.3f})")
+        
+        # 디버깅 통계 출력
+        logger.info(f"📊 필터링 통계: 총 {debug_stats['total_candidates']}개 → "
+                   f"유사도필터 {debug_stats['similarity_filtered']}개 제외 → "
+                   f"가격필터 {debug_stats['price_filtered']}개 제외 → "
+                   f"최종 {debug_stats['final_recommendations']}개")
         
         # 최종 점수로 정렬
         recommendations.sort(key=lambda x: x["final_score"], reverse=True)
@@ -176,7 +199,12 @@ class RecommendationService:
         # 요청된 개수만큼 반환
         final_recommendations = recommendations[:request.top_k]
         
-        logger.info(f"🎯 프로필 추천 결과: 평균 유사도 {np.mean([r['similarity_score'] for r in final_recommendations]):.3f}")
+        if final_recommendations:
+            avg_similarity = sum(r['similarity_score'] for r in final_recommendations) / len(final_recommendations)
+            logger.info(f"🎯 프로필 추천 결과: 평균 유사도 {avg_similarity:.3f}")
+        else:
+            logger.warning("🚨 최종 추천 결과 없음 - 모든 필터 통과한 상품이 없음")
+        
         return final_recommendations
     
     def _calculate_profile_match_score(
