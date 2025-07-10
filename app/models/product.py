@@ -72,17 +72,6 @@ class ProductEmbedding(BaseModel):
     class Config:
         from_attributes = True
 
-
-class ProductRecommendationRequest(BaseModel):
-    """상품 추천 요청"""
-    user_diagnosis: str = Field(..., description="사용자 진단 결과 텍스트")
-    top_k: int = Field(default=10, ge=1, le=50, description="추천할 상품 개수")
-    exclude_categories: Optional[List[ProductCategory]] = Field(default=None, description="제외할 카테고리")
-    include_categories: Optional[List[ProductCategory]] = Field(default=None, description="포함할 카테고리")
-    min_similarity: Optional[float] = Field(default=0.3, ge=0, le=1, description="최소 유사도 임계값")
-    max_price: Optional[Decimal] = Field(default=None, ge=0, description="최대 가격 필터")
-
-
 class RecommendedProduct(BaseModel):
     """추천된 상품 정보"""
     product: Product
@@ -90,14 +79,3 @@ class RecommendedProduct(BaseModel):
     recommendation_reason: str = Field(..., description="추천 이유")
     matched_keywords: List[str] = Field(default_factory=list, description="매칭된 키워드")
     confidence_score: float = Field(..., ge=0, le=1, description="추천 신뢰도")
-
-
-class ProductRecommendationResponse(BaseModel):
-    """상품 추천 응답"""
-    recommendations: List[RecommendedProduct]
-    total_count: int
-    processing_time_ms: float
-    request_info: ProductRecommendationRequest
-    
-    class Config:
-        from_attributes = True
