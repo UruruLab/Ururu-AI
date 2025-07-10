@@ -87,7 +87,7 @@ async def get_recommendations(
         for result in recommendation_results:
             try:
                 # recommendation_service에서 반환된 결과를 파싱
-                product_details = await recommendation_service._get_product_details([result["product_id"]])
+                product_details = await recommendation_service._get_product_details_with_category_filter([result["product_id"]])
                 
                 if result["product_id"] in product_details:
                     product_info = product_details[result["product_id"]]
