@@ -51,13 +51,13 @@ class RecommendationService:
             user_embedding = self.user_tower_service.generate_user_embedding(request.beauty_profile)
             logger.debug(f"🧠 사용자 임베딩 생성 완료: {len(user_embedding)}차원")
             
-            # 2. 🔧 개선: 더 많은 후보 상품 검색
+            # 2. 더 많은 후보 상품 검색
             if request.include_categories or request.exclude_categories:
                 search_multiplier = 8 
             else:
                 search_multiplier = 5 
             
-            search_k = min(request.top_k * search_multiplier, 200)  # 최대 200개까지 확장
+            search_k = min(request.top_k * search_multiplier, 200) 
 
             raw_scores, product_ids = await self.vector_store.search_vectors(
                 user_embedding.tolist(), 
@@ -70,7 +70,7 @@ class RecommendationService:
             
             logger.info(f"🔍 벡터 검색 완료: {len(product_ids)}개 상품")
             
-            # 3. 🔧 개선된 카테고리 필터링 - SQL 레벨에서만 처리
+            # 3. 개선된 카테고리 필터링 - SQL 레벨에서만 처리
             product_details = await self._get_product_details_with_category_filter(
                 product_ids,
                 request.include_categories,
@@ -91,12 +91,11 @@ class RecommendationService:
                 request
             )
             
-            # 5. 🔧 개선: 충분한 결과가 없으면 fallback과 결합
+            # 5. 충분한 결과가 없으면 fallback과 결합
             if len(recommendations) < request.top_k:
                 logger.info(f"⚠️ 결과 부족 ({len(recommendations)}/{request.top_k}), fallback 추가")
                 fallback_results = await self._fallback_recommendation(request)
                 
-                # 중복 제거하면서 fallback 결과 추가
                 existing_ids = {r['product_id'] for r in recommendations}
                 for fallback in fallback_results:
                     if fallback['product_id'] not in existing_ids and len(recommendations) < request.top_k:
@@ -146,16 +145,15 @@ class RecommendationService:
             similarity_score = self._convert_faiss_score_to_similarity(raw_score)
             logger.debug(f"상품 {product_id} ({product.name[:20]}): 원시점수={raw_score:.4f}, 유사도={similarity_score:.4f}")
             
-            # 2. 🔧 개선: 최소 유사도 임계값 체크 (더 관대하게)
+            # 2. 최소 유사도 임계값 체크 
             if similarity_score < min_threshold:
                 logger.debug(f"상품 {product_id} 유사도 임계값 미달: {similarity_score:.3f} < {min_threshold}")
                 debug_stats["similarity_filtered"] += 1
                 continue
             
-            # 3. 🔧 개선: 가격 필터를 더 관대하게 적용
+            # 3. 가격 필터
             if request.use_price_filter:
                 product_price = float(product.base_price)
-                # 가격 범위를 20% 정도 확장
                 expanded_min = request.beauty_profile.min_price * 0.8
                 expanded_max = request.beauty_profile.max_price * 1.2
                 
@@ -174,14 +172,14 @@ class RecommendationService:
             # 5. 최종 점수 계산
             final_score = (similarity_score * 0.7 + profile_match_score * 0.3)
             
-            # 6. 🔧 개선: 매칭된 특성 추출
+            # 6. 매칭된 특성 추출
             matched_features = self._extract_matched_features_improved(
                 request.beauty_profile,
                 product,
                 details
             )
             
-            # 7. 🔧 개선: 추천 이유 생성
+            # 7. 추천 이유 생성
             recommendation_reason = self._generate_recommendation_reason_improved(
                 similarity_score, 
                 profile_match_score,
@@ -270,11 +268,11 @@ class RecommendationService:
         product: Product,
         product_details: Dict[str, Any]
     ) -> List[str]:
-        """개선된 매칭 특성 추출 - 더 관대한 매칭"""
+        """개선된 매칭 특성 추출"""
         
         matched = []
         
-        # 1. 🔧 개선: 피부타입 매칭 (더 관대하게)
+        # 1. 피부타입 매칭
         skin_compatibility = product_details.get("skin_types", [])
         product_name = product.name.lower()
         product_description = (product.description or "").lower()
@@ -289,7 +287,7 @@ class RecommendationService:
         elif "모든피부" in skin_compatibility or "전피부" in product_description:
             matched.append("모든 피부타입 적합")
         
-        # 2. 🔧 개선: 피부 고민 매칭 (키워드 확장)
+        # 2. 피부 고민 매칭 
         if beauty_profile.concerns:
             product_benefits = product_details.get("benefits", [])
             all_text = f"{product_name} {product_description} {' '.join(product_benefits)}".lower()
@@ -407,7 +405,6 @@ class RecommendationService:
                         )
                         
                     elif include_categories:
-                        # include만 있는 경우
                         include_names = self._get_all_related_category_names(include_categories, category_mapping)
                         logger.info(f"🔍 확장된 include 카테고리: {include_names}")
                         
@@ -419,7 +416,6 @@ class RecommendationService:
                         stmt = stmt.where(DBProduct.id.in_(include_subquery))
                         
                     elif exclude_categories:
-                        # exclude만 있는 경우
                         exclude_names = self._get_all_related_category_names(exclude_categories, category_mapping)
                         logger.info(f"🔍 확장된 exclude 카테고리: {exclude_names}")
                         
@@ -519,7 +515,6 @@ class RecommendationService:
             
         except Exception as e:
             logger.error(f"카테고리 계층 매핑 생성 실패: {e}")
-            # 기본값으로 메인 카테고리만 반환
             return {
                 "스킨케어": ["스킨케어"],
                 "메이크업": ["메이크업"],
@@ -874,8 +869,7 @@ class RecommendationService:
                         )
                         stmt = stmt.where(not_(DBProduct.id.in_(exclude_subquery)))
                 
-                # 🔧 개선: 더 많은 fallback 후보 조회
-                stmt = stmt.limit(100)  # 기존 50 → 100으로 증가
+                stmt = stmt.limit(100) 
                 result = await db.execute(stmt)
                 db_products = result.scalars().all()
 
@@ -890,16 +884,14 @@ class RecommendationService:
                     try:
                         product = await self.product_converter.db_to_pydantic(db, db_product)
 
-                        # 🔧 개선: 가격 필터 더 관대하게 적용
                         if request.use_price_filter:
                             product_price = float(product.base_price)
-                            expanded_min = request.beauty_profile.min_price * 0.5  # 50% 확장
-                            expanded_max = request.beauty_profile.max_price * 1.5  # 150% 확장
+                            expanded_min = request.beauty_profile.min_price * 0.5  
+                            expanded_max = request.beauty_profile.max_price * 1.5  
                             
                             if not (expanded_min <= product_price <= expanded_max):
                                 continue
                         
-                        # 🔧 개선: Fallback 추천 이유 개선
                         product_name = product.name.lower()
                         beauty_keywords = ["보습", "수분", "진정", "순한", "민감", "여드름", "트러블"]
                         found_keywords = [kw for kw in beauty_keywords if kw in product_name]
@@ -911,9 +903,9 @@ class RecommendationService:
                         
                         fallback_results.append({
                             "product_id": db_product.id,
-                            "similarity_score": max(0.4 - (processed_count * 0.01), 0.1),  # 최소 0.1 보장
+                            "similarity_score": max(0.4 - (processed_count * 0.01), 0.1), 
                             "profile_match_score": 0.3,
-                            "final_score": max(0.35 - (processed_count * 0.01), 0.15),  # 최소 0.15 보장
+                            "final_score": max(0.35 - (processed_count * 0.01), 0.15), 
                             "confidence_score": 0.3,
                             "ranking_position": processed_count + 1,
                             "recommendation_reason": reason,
@@ -925,7 +917,7 @@ class RecommendationService:
                         })
 
                         processed_count += 1
-                        if processed_count >= request.top_k * 2:  # 요청의 2배까지 준비
+                        if processed_count >= request.top_k * 2: 
                             break
                         
                     except Exception as e:

@@ -28,7 +28,7 @@ def setup_logging():
     # 4. 루트 로거 설정
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-    root_logger.handlers.clear()  # 기존 핸들러 제거
+    root_logger.handlers.clear()  
     root_logger.addHandler(console_handler)
     
     # 5. Uvicorn 로거들 설정
@@ -43,7 +43,7 @@ def setup_logging():
         logger.setLevel(log_level)
         logger.handlers.clear()
         logger.addHandler(console_handler)
-        logger.propagate = False  # 중복 로그 방지
+        logger.propagate = False  
     
     # 6. FastAPI 앱 로거들 설정
     app_loggers = [
@@ -56,7 +56,6 @@ def setup_logging():
     for logger_name in app_loggers:
         logger = logging.getLogger(logger_name)
         logger.setLevel(log_level)
-        # 루트 로거로 전파하도록 설정 (중복 방지를 위해 핸들러는 추가하지 않음)
         logger.propagate = True
     
     print(f"✅ 로깅 설정 완료: {log_level_str} 레벨")
