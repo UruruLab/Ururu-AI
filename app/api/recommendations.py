@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Dict, Any
 import logging
 import time
+from sqlalchemy import select 
 
 from app.models.product import (
     ProductRecommendationRequest, 
@@ -12,6 +13,7 @@ from app.models.product import (
 from app.services.recommendation_service import RecommendationService
 from app.core.dependencies import get_recommendation_service
 from app.core.database import get_async_db
+from app.models.database import DBProduct
 from app.clients.spring_client import get_spring_client, SpringBootClient
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
@@ -193,3 +195,89 @@ async def _log_recommendation_result(
         
     except Exception as e:
         logger.error(f"추천 로그 저장 실패: {e}")
+
+
+@router.post("/debug", 
+             summary="디버깅용 추천 테스트",
+             description="추천 시스템의 각 단계별 결과를 확인하는 디버깅 API")
+async def debug_recommendation_process(
+    request: ProductRecommendationRequest,
+    recommendation_service: RecommendationService = Depends(get_recommendation_service),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """추천 시스템 디버깅"""
+    
+    debug_info = {
+        "request": request.dict(),
+        "steps": {}
+    }
+    
+    try:
+        # 1단계: 벡터 검색
+        user_embedding = recommendation_service.embedding_service.encode_text(request.user_diagnosis)
+        raw_scores, product_ids = await recommendation_service.vector_store.search_vectors(
+            user_embedding, 30
+        )
+        
+        debug_info["steps"]["vector_search"] = {
+            "total_results": len(product_ids),
+            "product_ids": product_ids[:10],  # 처음 10개만
+            "scores": raw_scores[:10]
+        }
+        
+        # 2단계: 기본 상품 존재 여부 확인
+        basic_stmt = (
+            select(DBProduct)
+            .where(DBProduct.id.in_(product_ids[:10]))
+            .where(DBProduct.status == "ACTIVE")
+        )
+        basic_result = await db.execute(basic_stmt)
+        basic_products = basic_result.scalars().all()
+        
+        debug_info["steps"]["basic_products"] = {
+            "found_count": len(basic_products),
+            "product_info": [{"id": p.id, "name": p.name} for p in basic_products]
+        }
+        
+        # 3단계: 카테고리 정보 확인
+        category_debug = await recommendation_service.debug_product_categories(product_ids[:5])
+        debug_info["steps"]["category_info"] = category_debug
+        
+        # 4단계: 카테고리 필터 적용 테스트
+        if request.include_categories or request.exclude_categories:
+            filtered_details = await recommendation_service._get_filtered_product_details(
+                product_ids[:10], 
+                request.include_categories, 
+                request.exclude_categories
+            )
+            
+            debug_info["steps"]["category_filtering"] = {
+                "filtered_count": len(filtered_details),
+                "filtered_products": [
+                    {
+                        "id": pid, 
+                        "category": details["product"].category_main.value
+                    } 
+                    for pid, details in filtered_details.items()
+                ]
+            }
+        
+        # 5단계: Fallback 테스트
+        fallback_results = await recommendation_service._fallback_recommendation(request)
+        debug_info["steps"]["fallback"] = {
+            "result_count": len(fallback_results),
+            "results": fallback_results[:3]  # 처음 3개만
+        }
+        
+        return {
+            "status": "debug_complete",
+            "debug_info": debug_info
+        }
+        
+    except Exception as e:
+        logger.error(f"디버깅 실패: {e}")
+        return {
+            "status": "debug_failed",
+            "error": str(e),
+            "debug_info": debug_info
+        }

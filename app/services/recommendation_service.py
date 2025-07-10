@@ -730,3 +730,45 @@ class RecommendationService:
                 "fallback": "Database Query"
             }
         }
+    
+        
+
+    # 추가: 디버깅을 위한 카테고리 확인 메서드
+    async def debug_product_categories(self, product_ids: List[int]) -> Dict[str, Any]:
+        """디버깅용: 상품들의 카테고리 정보 확인"""
+        try:
+            async with AsyncSessionLocal() as db:
+                debug_info = {}
+                
+                for product_id in product_ids[:5]:  # 처음 5개만 확인
+                    # 상품 기본 정보
+                    product_stmt = select(DBProduct).where(DBProduct.id == product_id)
+                    product_result = await db.execute(product_stmt)
+                    product = product_result.scalar_one_or_none()
+                    
+                    if not product:
+                        debug_info[product_id] = {"status": "not_found"}
+                        continue
+                    
+                    # 카테고리 정보 조회
+                    category_stmt = (
+                        select(DBCategory.name, DBCategory.depth)
+                        .select_from(DBProductCategory)
+                        .join(DBCategory)
+                        .where(DBProductCategory.product_id == product_id)
+                    )
+                    category_result = await db.execute(category_stmt)
+                    categories = [(row[0], row[1]) for row in category_result.fetchall()]
+                    
+                    debug_info[product_id] = {
+                        "name": product.name,
+                        "status": product.status,
+                        "categories": categories,
+                        "main_category": categories[0][0] if categories else "없음"
+                    }
+                
+                return debug_info
+                
+        except Exception as e:
+            logger.error(f"디버깅 카테고리 조회 실패: {e}")
+            return {}
