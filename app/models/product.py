@@ -31,10 +31,6 @@ class ProductBase(BaseModel):
     base_price: Decimal = Field(..., ge=0, description="기본 가격")
 
 
-class ProductCreate(ProductBase):
-    pass
-
-
 class ProductOption(BaseModel):
     id: int
     option_name: str = Field(..., description="옵션명")
@@ -59,7 +55,7 @@ class ProductEmbedding(BaseModel):
     """상품 임베딩 정보"""
     id: int
     product_id: int
-    embedding_vector: List[float] = Field(..., description="임베딩 벡터 (768차원)")
+    embedding_vector: List[float] = Field(..., description="임베딩 벡터")
     text_content: str = Field(..., description="임베딩에 사용된 텍스트 내용")
     model_version: str = Field(default="KoSBERT-v1", description="사용된 모델 버전")
     embedding_dimension: int = Field(default=768, description="임베딩 벡터 차원")
@@ -75,16 +71,6 @@ class ProductEmbedding(BaseModel):
     
     class Config:
         from_attributes = True
-
-
-class ProductProfile(BaseModel):
-    """상품 프로필 - User의 BeautyProfile과 대응"""
-    product_type: ProductCategory
-    skin_compatibility: List[str] = Field(..., description="적합한 피부 타입")
-    key_ingredients: List[str] = Field(..., description="주요 성분")
-    benefits: List[str] = Field(..., description="제품 효능/혜택")
-    price_range: str = Field(..., description="가격대")
-    target_concerns: List[str] = Field(..., description="타겟 피부 고민")
 
 
 class ProductRecommendationRequest(BaseModel):
