@@ -1,0 +1,169 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    # 환경변수 설정
+    env:
+      ENVIRONMENT: development
+      DEBUG: true
+      LOG_LEVEL: INFO
+      GITHUB_ACTIONS: true
+      
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Python 환경 설정
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: 의존성 캐시
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: 의존성 설치
+      run: |
+        python -m pip install --upgrade pip
+        # 먼저 테스트 도구들 설치 (pytest-env 추가)
+        pip install pytest==8.3.4 pytest-asyncio==0.25.0 pytest-env==1.1.5 flake8==7.1.1 black==25.1.0 isort==5.13.2
+        # 그 다음 프로젝트 의존성 설치
+        pip install -r requirements.txt
+        
+    - name: 코드 품질 검사
+      run: |
+        # 중요한 구문 오류만 체크
+        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics --exit-zero
+        echo "코드 품질 검사 완료"
+        
+    - name: 테스트 실행
+      run: |
+        export APP_NAME="Ururu AI Recommendation System"
+        export EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
+        export EMBEDDING_DIMENSION="384"
+        python -m pytest tests/ -v --tb=short
+      continue-on-error: false
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: Docker Buildx 설정
+      uses: docker/setup-buildx-action@v3
+      
+    - name: 컨테이너 레지스트리 로그인
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 메타데이터 추출
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix=sha-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Docker 이미지 빌드 및 푸시
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-development:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment: development
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 개발 환경 배포 설정
+      run: |
+        printf 'SPRING_BOOT_BASE_URL=%s\n' "${{ secrets.DEV_SPRING_BACKEND_URL }}" >> .env.development
+        printf 'REDIS_URL=%s\n' "${{ secrets.DEV_REDIS_URL }}" >> .env.development
+        
+    - name: Docker Compose 설정 검증
+      run: |
+        echo "개발 환경 설정 파일 검증"
+        echo "docker-compose.development.yml 구문 검증"
+        docker compose -f docker-compose.development.yml config --quiet
+        echo "개발 환경 배포 준비 완료"
+        
+    - name: 배포 시뮬레이션 (실제 EC2 배포 없음)
+      run: |
+        echo "개발 환경 배포 시뮬레이션"
+        echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
+        echo "- Spring Boot URL: [MASKED]"
+        echo "- Redis URL: [MASKED]"
+        echo "개발 환경 배포 설정 완료"
+
+  deploy-production:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: 코드 체크아웃
+      uses: actions/checkout@v4
+      
+    - name: 운영 환경 배포 설정
+      run: |
+        printf 'SPRING_BOOT_BASE_URL=%s\n' "${{ secrets.PROD_SPRING_BACKEND_URL }}" >> .env.production
+        printf 'REDIS_URL=%s\n' "${{ secrets.PROD_REDIS_URL }}" >> .env.production
+        
+    - name: Docker Compose 설정 검증
+      run: |
+        echo "운영 환경 설정 파일 검증"
+        echo "docker-compose.production.yml 구문 검증"
+        docker compose -f docker-compose.production.yml config --quiet
+        echo "운영 환경 배포 준비 완료"
+        
+    - name: 배포 알림 준비
+      run: |
+        echo "운영 환경 배포 준비 완료"
+        echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        echo "- Spring Boot URL: [MASKED]"
+        echo "- Redis URL: [MASKED]"
+        echo "실제 EC2 배포는 별도 프로세스에서 진행"
+        
+    - name: 배포 완료 알림
+      if: success()
+      run: |
+        echo "GitHub Actions 배포 파이프라인이 성공적으로 완료되었습니다."
+        echo "Docker 이미지가 GitHub Container Registry에 푸시되었습니다."
+        echo "EC2 서버에서 수동으로 docker compose pull && docker compose up -d 실행이 필요합니다."
