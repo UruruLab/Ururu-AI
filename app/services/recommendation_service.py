@@ -124,6 +124,34 @@ class RecommendationService:
                 
                 logger.debug(f" DB 쿼리 결과 : {len(db_products)}개 상품")
 
+                if not db_product:
+                    logger.warning(f"🔍 DB 쿼리 결과 없음 - 디버깅 정보:")
+                    logger.warning(f"  - 검색 대상 상품 ID: {product_ids[:10]}...")
+                    logger.warning(f"  - Include 카테고리: {[cat.value for cat in include_categories] if include_categories else None}")
+                    logger.warning(f"  - Exclude 카테고리: {[cat.value for cat in exclude_categories] if exclude_categories else None}")
+
+                    basic_stmt = (
+                        select(DBProduct)
+                        .where(DBProduct.id.in_(product_ids[:5]))
+                        .where(DBProduct.status == "ACTIVE")
+                    )
+                    basic_result = await db.execute(basic_stmt)
+                    basic_products = basic_result.scalar().all()
+                    logger.warning(f"   - 필터 없이 조회한 상품 수: {len(basic_products)}개")
+                
+                if basic_products:
+                    first_product = basic_products[0]
+                    catetory_stmt = (
+                        select(DBCategory.name)
+                        .select_from(DBProductCategory)
+                        .join(DBCategory)
+                        .where(DBProductCategory.product_id == first_product.id)
+                    )
+                    catetory_result = await db.execute(catetory_stmt)
+                    categories = [row[0] for row in catetory_result.fetchall()]
+                    logger.warning(f"    - 첫 번째 상품({first_product.id})의 카테고리: {categories}")
+
+
                 product_details = {}
                 for db_product in db_products:
                     try:
@@ -164,12 +192,21 @@ class RecommendationService:
             include_categories: Optional[List[ProductCategory]] = None,
             exclude_categories: Optional[List[ProductCategory]] = None
     ):
-        if include_categories:
+        if include_categories and exclude_categories:
+            logger.debug("include + exclude 카테고리 동시 적용")
             include_names = [cat.value for cat in include_categories]
-            logger.debug(f"Include 카테고리 적용: {include_names}")
             stmt = stmt.join(DBProductCategory).join(DBCategory).where(
                 DBCategory.name.in_(include_names)
             )
+            return stmt
+        
+        elif include_categories:
+            include_names = [cat.value for cat in include_categories]
+            logger.debug(f"Include 카테고리만 적용: {include_names}")
+            stmt = stmt.join(DBProductCategory).join(DBCategory).where(
+                DBCategory.name.in_(include_names)
+            )
+            return stmt
         
         if exclude_categories:
             exclude_names = [cat.value for cat in exclude_categories]
@@ -181,6 +218,7 @@ class RecommendationService:
             )
 
             stmt = stmt.where(not_(DBProduct.id.in_(exclude_subquery)))
+            return stmt
 
         return stmt
 
@@ -538,37 +576,59 @@ class RecommendationService:
                         stmt, request.include_categories, request.exclude_categories
                     )
                 
-                if request.max_price:
-                    stmt = stmt.join(DBProductOption).where(
-                        and_(
-                            DBProductOption.price <= request.max_price,
-                            DBProductOption.is_deleted == False
-                        )
-                    )
-
-                stmt = stmt.limit(request.top_k)
+                # if request.max_price:
+                #     stmt = stmt.join(DBProductOption).where(
+                #         and_(
+                #             DBProductOption.price <= request.max_price,
+                #             DBProductOption.is_deleted == False
+                #         )
+                #     )
+                # stmt = stmt.limit(request.top_k)
                 
                 result = await db.execute(stmt)
                 db_products = result.scalars().all()
+
+                if not db_products:
+                    logger.warning("카테고리 필터 후에도 결과 없음")
+                    return []
                 
                 fallback_results = []
+                processd_count = 0
+
                 for i, db_product in enumerate(db_products):
                     try:
                         product = await self.product_converter.db_to_pydantic(db, db_product)
+
+                        if not self._passes_category_filter(
+                            product, request.include_categories, request.exclude_categories
+                        ):
+                            logger.debug(f"Fallback: 상품 {product.id} 카테고리 필터 실패")
+                            continue
+
+                        if request.max_price and db_product.product_options:
+                            active_options = [opt for opt in db_product.product_options if not opt.is_deleted]
+                            if active_options:
+                                min_price = min(opt.price for opt in active_options)
+                                if min_price > request.max_price:
+                                    continue
                         
                         fallback_results.append({
                             "product_id": db_product.id,
-                            "similarity_score": 0.4 - (i * 0.02),
+                            "similarity_score": 0.4 - (processd_count * 0.02),
                             "keyword_boost": 0.3,
-                            "final_score": 0.35 - (i * 0.02),
+                            "final_score": 0.35 - (processd_count * 0.02),
                             "matched_keywords": [],
-                            "ranking_position": i + 1,
+                            "ranking_position": processd_count + 1,
                             "recommendation_reason": self._generate_fallback_reason(product, request),
                             "confidence_level": "low",
                             "category_path": f"{product.category_main.value} > {product.category_sub}",
-                            "price_range": f"증가 ({float(product.base_price):,.0f}원)",
+                            "price_range": self._get_actual_price_range(db_product),
                             "source": "database_fallback"
                         })
+
+                        processd_count += 1
+                        if processd_count >= request.top_k:
+                            break
                         
                     except Exception as e:
                         logger.error(f"Fallback 상품 {db_product.id} 처리 실패: {e}")
