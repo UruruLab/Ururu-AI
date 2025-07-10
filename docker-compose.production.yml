@@ -36,3 +36,7 @@ services:
     networks:
       - ururu-network
     restart: unless-stopped
+
+networks:
+  ururu-network:
+    driver: bridge
