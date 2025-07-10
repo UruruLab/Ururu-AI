@@ -3,14 +3,14 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_, or_, not_
 from sqlalchemy.orm import selectinload
 
 from app.services.faiss_service import FaissVectorStore
 from app.services.embedding_service import EmbeddingService
 from app.services.product_tower_service import ProductTowerService
 from app.services.product_converter import ProductConverter
-from app.models.product import ProductRecommendationRequest, Product
+from app.models.product import ProductRecommendationRequest, Product, ProductCategory
 from app.models.database import DBProduct, DBProductOption, DBCategory, DBProductCategory
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -40,41 +40,66 @@ class RecommendationService:
     ) -> List[Dict[str, Any]]:
         """메인 상품 추천 로직 - 벡터 검색 + 실제 DB 연동"""
         
-        logger.debug(f"🔍 상품 추천 시작: '{request.user_diagnosis[:30]}...'")
+        logger.info(f"🔍 상품 추천 시작: '{request.user_diagnosis[:30]}...'")
         
         try:
             # 1. 사용자 진단을 임베딩으로 변환
             user_embedding = self.embedding_service.encode_text(request.user_diagnosis)
             
             # 2. Faiss 벡터 검색 (순수 검색)
+            search_multiplier = 3 if (request.include_categories or request.exclude_categories) else 2
+            search_k = min(request.top_k * search_multiplier, 100)
+
             raw_scores, product_ids = await self.vector_store.search_vectors(
                 user_embedding, 
-                request.top_k * 2  
+                search_k 
             )
             
             if not product_ids:
                 logger.warning("벡터 검색 결과 없음")
                 return await self._fallback_recommendation(request)
             
-            # 3. 실제 DB에서 상품 정보 조회
-            product_details = await self._get_product_details(product_ids)
+            logger.debug(f"🔎 벡터 검색 완료: {len(product_ids)}개 상품 ID")
             
-            # 4. 비즈니스 로직 적용 (점수 변환, 필터링, 랭킹)
+            # 3. 실제 DB에서 상품 정보 조회
+            product_details = await self._get_product_details(
+                product_ids,
+                request.include_categories,
+                request.exclude_categories
+            )
+
+            if not product_details:
+                logger.warning("카테고리 필터링 후 검색 결과 없음 - Fallback 실행")
+                return await self._fallback_recommendation(request)
+            
+            logger.info(f"카테고리 필터링 후 : {len(product_details)}개 상품")
+
+            # 4. 벡터 검색 점수를 필터링된 상품에만 매핑
+            filtered_scores, filtered_product_ids = self._map_scores_to_filtered_products(
+                raw_scores, product_ids, list(product_details.keys())
+            )
+            
+            # 5. 비즈니스 로직 적용 (점수 변환, 필터링, 랭킹)
             recommendations = await self._apply_recommendation_logic(
-                raw_scores, 
-                product_ids, 
+                filtered_scores, 
+                filtered_product_ids, 
                 product_details,
                 request
             )
             
-            logger.debug(f"✅ 추천 완료: {len(recommendations)}개 상품")
+            logger.info(f"✅ 추천 완료: {len(recommendations)}개 상품")
             return recommendations
             
         except Exception as e:
             logger.error(f"추천 실패: {e}")
             return await self._fallback_recommendation(request)
     
-    async def _get_product_details(self, product_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+    async def _get_product_details(
+            self, 
+            product_ids: List[int],
+            include_categories: Optional[List[ProductCategory]] = None,
+            exclude_categories: Optional[List[ProductCategory]] = None,
+    ) -> Dict[int, Dict[str, Any]]:
         """실제 DB에서 상품 상세 정보 조회"""
         try:
             async with AsyncSessionLocal() as db:
@@ -89,14 +114,26 @@ class RecommendationService:
                     .where(DBProduct.status == "ACTIVE")
                 )
                 
+                if include_categories or exclude_categories:
+                    stmt = self._apply_category_filter_to_query(
+                        stmt, include_categories, exclude_categories
+                    )
+
                 result = await db.execute(stmt)
                 db_products = result.scalars().all()
                 
+                logger.debug(f" DB 쿼리 결과 : {len(db_products)}개 상품")
+
                 product_details = {}
                 for db_product in db_products:
                     try:
                         # Pydantic 모델로 변환
                         product = await self.product_converter.db_to_pydantic(db, db_product)
+
+                        # 한번 더 카테고리 필터 확인 (추후 삭제해도 무방)
+                        if not self._passes_category_filter(product, include_categories, exclude_categories):
+                            logger.debug(f"상품 {product.id} 메모리 레벨 카테고리 필터 실패")
+                            continue
                         
                         # 추가 상세 정보 추출
                         details = {
@@ -120,6 +157,61 @@ class RecommendationService:
         except Exception as e:
             logger.error(f"상품 상세 정보 조회 실패: {e}")
             return {}
+        
+    def _apply_category_filter_to_query(
+            self,
+            stmt,
+            include_categories: Optional[List[ProductCategory]] = None,
+            exclude_categories: Optional[List[ProductCategory]] = None
+    ):
+        if include_categories:
+            include_names = [cat.value for cat in include_categories]
+            logger.debug(f"Include 카테고리 적용: {include_names}")
+            stmt = stmt.join(DBProductCategory).join(DBCategory).where(
+                DBCategory.name.in_(include_names)
+            )
+        
+        if exclude_categories:
+            exclude_names = [cat.value for cat in exclude_categories]
+            logger.debug(f"Exclude 카테고리 적용: {exclude_names}")
+            exclude_subquery = (
+                select(DBProductCategory.product_id)
+                .join(DBCategory)
+                .where(DBCategory.name.in_(exclude_names))
+            )
+
+            stmt = stmt.where(not_(DBProduct.id.in_(exclude_subquery)))
+
+        return stmt
+
+    def _passes_category_filter(
+            self,
+            product: Product,
+            include_categories: Optional[List[ProductCategory]] = None,
+            exclude_categories: Optional[List[ProductCategory]] = None
+    ) -> bool:
+        if include_categories:
+            if product.category_main not in include_categories:
+                return False
+        if exclude_categories:
+            if product.category_main in exclude_categories:
+                return False
+        return True
+    
+    def _map_scores_to_filtered_products(
+            self,
+            raw_scored: List[float],
+            all_product_ids: List[int],
+            filtered_product_ids: List[int]
+    ) -> Tuple[List[float], List[int]]:
+        filtered_scores = []
+        final_product_ids = []
+
+        for score, product_id in zip(raw_scored, all_product_ids):
+            if product_id in filtered_product_ids:
+                final_product_ids.append(product_id)
+
+        return filtered_scores, final_product_ids
     
     async def _get_category_path(self, db: AsyncSession, product_id: int) -> str:
         """상품의 전체 카테고리 경로 조회"""
@@ -439,8 +531,22 @@ class RecommendationService:
                     select(DBProduct)
                     .options(selectinload(DBProduct.product_options))
                     .where(DBProduct.status == "ACTIVE")
-                    .limit(request.top_k)
                 )
+
+                if request.include_categories or request.exclude_categories:
+                    stmt = self._apply_category_filter_to_query(
+                        stmt, request.include_categories, request.exclude_categories
+                    )
+                
+                if request.max_price:
+                    stmt = stmt.join(DBProductOption).where(
+                        and_(
+                            DBProductOption.price <= request.max_price,
+                            DBProductOption.is_deleted == False
+                        )
+                    )
+
+                stmt = stmt.limit(request.top_k)
                 
                 result = await db.execute(stmt)
                 db_products = result.scalars().all()
@@ -457,10 +563,10 @@ class RecommendationService:
                             "final_score": 0.35 - (i * 0.02),
                             "matched_keywords": [],
                             "ranking_position": i + 1,
-                            "recommendation_reason": f"인기 {product.category_main.value} 제품으로 일반적으로 추천됩니다",
+                            "recommendation_reason": self._generate_fallback_reason(product, request),
                             "confidence_level": "low",
                             "category_path": f"{product.category_main.value} > {product.category_sub}",
-                            "price_range": f"중가 ({float(product.base_price):,.0f}원)",
+                            "price_range": f"증가 ({float(product.base_price):,.0f}원)",
                             "source": "database_fallback"
                         })
                         
@@ -473,6 +579,25 @@ class RecommendationService:
         except Exception as e:
             logger.error(f"DB 기반 Fallback 추천 실패: {e}")
             return []
+        
+    def _generate_fallback_reason(
+            self,
+            product: Product,
+            request: ProductRecommendationRequest
+    ) -> str:
+        reasons = []
+
+        if request.include_categories:
+            if product.category_main in request.include_categories:
+                reasons.append(f"요청하신 {product.category_main.value} 카테고리의")
+        
+        reasons.append("인기 제품으로")
+        
+        if request.max_price:
+            reasons.append(f"에산 {request.max_price:,}원 내에 ")
+
+        reasons.append("추천됩니다.")
+        return " ".join(reasons)
     
     async def add_product_to_index(self, product_data: Dict) -> bool:
         """새 상품을 벡터 인덱스에 추가 (실제 Product 객체 활용)"""
@@ -526,10 +651,12 @@ class RecommendationService:
             "embedding_model": self.embedding_service.get_model_info(),
             "algorithms": {
                 "vector_search": True,
+                "category_filtering": True,  
+                "db_level_filtering": True,  
+                "memory_level_filtering": True, 
                 "real_keyword_matching": True,
-                "category_diversity": True,
                 "price_filtering": True,
-                "db_fallback": True
+                "fallback_with_filtering": True  
             },
             "scoring_weights": {
                 "vector_similarity": 0.6,
