@@ -1,12 +1,15 @@
-version: '3.8'
-
 services:
   ururu-ai:
     build:
       target: development
     environment:
-      - DEBUG=true
-      - LOG_LEVEL=DEBUG
+      - ENVIRONMENT=development
+      - REDIS_HOST=redis  # 개발환경에서는 Redis 컨테이너와 연결
+      - REDIS_URL=redis://redis:6379
+      - SPRING_BOOT_INTEGRATION_ENABLED=false  # 개발환경에서는 Spring Boot 연동 비활성화
+      - USE_MOCK_DATA=true  # Mock 데이터 사용
+    env_file:
+      - .env.development
     volumes:
       - .:/app
       # 컨테이너 내부 venv 디렉토리 보호
@@ -15,6 +18,16 @@ services:
     # 개발환경에서만 디버깅용 포트 노출 (선택적)
     ports:
       - "${AI_PORT:-8001}:8000"  # 개발용으로만 8001 포트 노출
+    networks:
+      - ururu-network
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   # 개발용 Redis (캐싱 및 세션 저장용)
   redis:
@@ -27,6 +40,11 @@ services:
     command: redis-server --appendonly yes
     networks:
       - ururu-network
+
+networks:
+  ururu-network:
+    driver: bridge
+    name: ururu-network
 
 volumes:
   redis_data:
