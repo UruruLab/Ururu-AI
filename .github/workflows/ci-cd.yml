@@ -22,43 +22,43 @@ jobs:
       GITHUB_ACTIONS: true
       
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Setup Python Environment
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: Cache Dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-          
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        # Install test tools first (including pytest-env)
-        pip install pytest==8.3.4 pytest-asyncio==0.25.0 pytest-env==1.1.5 flake8==7.1.1 black==25.1.0 isort==5.13.2
-        # Then install project dependencies
-        pip install -r requirements.txt
-        
-    - name: Code Quality Check
-      run: |
-        # Check only critical syntax errors
-        flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        echo "Code quality check completed"
-        
-    - name: Run Tests
-      run: |
-        export APP_NAME="Ururu AI Recommendation System"
-        export EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
-        export EMBEDDING_DIMENSION="384"
-        python -m pytest tests/ -v --tb=short
-      continue-on-error: false
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install test tools first (including pytest-env)
+          pip install pytest==8.3.4 pytest-asyncio==0.25.0 pytest-env==1.1.5 flake8==7.1.1 black==25.1.0 isort==5.13.2
+          # Then install project dependencies
+          pip install -r requirements.txt
+
+      - name: Code Quality Check
+        run: |
+          # Check only critical syntax errors
+          flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          echo "Code quality check completed"
+
+      - name: Run Tests
+        run: |
+          export APP_NAME="Ururu AI Recommendation System"
+          export EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
+          export EMBEDDING_DIMENSION="384"
+          python -m pytest tests/ -v --tb=short
+        continue-on-error: false
 
   build-and-push:
     needs: test
@@ -66,40 +66,40 @@ jobs:
     if: github.event_name == 'push'
     
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Setup Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      
-    - name: Login to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ secrets.GHCR_USERNAME }}
-        password: ${{ secrets.GHCR_TOKEN }}
-        
-    - name: Extract Metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix=sha-
-          type=raw,value=latest,enable={{is_default_branch}}
-          
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.GHCR_USERNAME }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Extract Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy-development:
     needs: build-and-push
@@ -108,46 +108,46 @@ jobs:
     environment: development
     
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Checkout Config Repository
-      uses: actions/checkout@v4
-      with:
-        repository: UruruLab/Ururu-AI-Config
-        path: config
-        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        
-    - name: Copy Development Environment Config Files
-      run: |
-        if compgen -G "config/.env*" > /dev/null; then
-          if [ -f "config/.env.development" ]; then
-            cp config/.env.development .env.development
-            echo "✅ Development environment config files copied successfully"
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Checkout Config Repository
+        uses: actions/checkout@v4
+        with:
+          repository: UruruLab/Ururu-AI-Config
+          path: config
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: Copy Development Environment Config Files
+        run: |
+          if compgen -G "config/.env*" > /dev/null; then
+            if [ -f "config/.env.development" ]; then
+              cp config/.env.development .env.development
+              echo "✅ Development environment config files copied successfully"
+            else
+              echo "❌ .env.development not found in config repository"
+              exit 1
+            fi
           else
-            echo "❌ .env.development not found in config repository"
+            echo "❌ No config files found in config repository"
             exit 1
           fi
-        else
-          echo "❌ No config files found in config repository"
-          exit 1
-        fi
-        
-    - name: Validate Docker Compose Configuration
-      run: |
-        echo "Validating development environment configuration files"
-        echo "Validating docker-compose.development.yml syntax"
-        ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-        echo "Verifying environment variable bindings"
-        ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 10 "environment:" || true
-        echo "Development environment deployment preparation completed"
-        
-    - name: Simulate Deployment (No actual EC2 deployment)
-      run: |
-        echo "Development environment deployment simulation"
-        echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        echo "- Config File: .env.development (fetched from Config repository)"
-        echo "Development environment deployment configuration completed"
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          echo "Validating development environment configuration files"
+          echo "Validating docker-compose.development.yml syntax"
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
+          echo "Verifying environment variable bindings"
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 10 "environment:" || true
+          echo "Development environment deployment preparation completed"
+
+      - name: Simulate Deployment (No actual EC2 deployment)
+        run: |
+          echo "Development environment deployment simulation"
+          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
+          echo "- Config File: .env.development (fetched from Config repository)"
+          echo "Development environment deployment configuration completed"
 
   deploy-production:
     needs: build-and-push
@@ -156,50 +156,50 @@ jobs:
     environment: production
     
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Checkout Config Repository
-      uses: actions/checkout@v4
-      with:
-        repository: UruruLab/Ururu-AI-Config
-        path: config
-        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        
-    - name: Copy Production Environment Config Files
-      run: |
-        if compgen -G "config/.env*" > /dev/null; then
-          if [ -f "config/.env.production" ]; then
-            cp config/.env.production .env.production
-            echo "✅ Production environment config files copied successfully"
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Checkout Config Repository
+        uses: actions/checkout@v4
+        with:
+          repository: UruruLab/Ururu-AI-Config
+          path: config
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: Copy Production Environment Config Files
+        run: |
+          if compgen -G "config/.env*" > /dev/null; then
+            if [ -f "config/.env.production" ]; then
+              cp config/.env.production .env.production
+              echo "✅ Production environment config files copied successfully"
+            else
+              echo "❌ .env.production not found in config repository"
+              exit 1
+            fi
           else
-            echo "❌ .env.production not found in config repository"
+            echo "❌ No config files found in config repository"
             exit 1
           fi
-        else
-          echo "❌ No config files found in config repository"
-          exit 1
-        fi
         
-    - name: Validate Docker Compose Configuration
-      run: |
-        echo "Validating production environment configuration files"
-        echo "Validating docker-compose.production.yml syntax"
-        ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
-        echo "Verifying environment variable bindings"
-        ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 10 "environment:" || true
-        echo "Production environment deployment preparation completed"
-        
-    - name: Prepare Deployment Notification
-      run: |
-        echo "Production environment deployment preparation completed"
-        echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        echo "- Config File: .env.production (fetched from Config repository)"
-        echo "Actual EC2 deployment will be handled by separate process"
-        
-    - name: Deployment Completion Notification
-      if: success()
-      run: |
-        echo "GitHub Actions deployment pipeline completed successfully."
-        echo "Docker image has been pushed to GitHub Container Registry."
-        echo "Manual execution required on EC2 server: docker compose pull && docker compose up -d"
+      - name: Validate Docker Compose Configuration
+        run: |
+          echo "Validating production environment configuration files"
+          echo "Validating docker-compose.production.yml syntax"
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
+          echo "Verifying environment variable bindings"
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 10 "environment:" || true
+          echo "Production environment deployment preparation completed"
+
+      - name: Prepare Deployment Notification
+        run: |
+          echo "Production environment deployment preparation completed"
+          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "- Config File: .env.production (fetched from Config repository)"
+          echo "Actual EC2 deployment will be handled by separate process"
+
+      - name: Deployment Completion Notification
+        if: success()
+        run: |
+          echo "GitHub Actions deployment pipeline completed successfully."
+          echo "Docker image has been pushed to GitHub Container Registry."
+          echo "Manual execution required on EC2 server: docker compose pull && docker compose up -d"

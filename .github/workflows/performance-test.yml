@@ -19,151 +19,151 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: 코드 체크아웃
-      uses: actions/checkout@v4
-      
-    - name: Python 환경 설정
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-        
-    - name: 성능 테스트 도구 설치
-      run: |
-        pip install locust==2.31.0 requests==2.32.3 fastapi==0.111.0 uvicorn==0.30.0
-        
-    - name: 테스트용 FastAPI 서버 시작
-      run: |
-        # 간단한 테스트 서버 생성
-        cat > test_server.py << 'EOF'
-        from fastapi import FastAPI
-        import uvicorn
-        import asyncio
-        
-        app = FastAPI(title="Test Ururu AI Server")
-        
-        @app.get("/health")
-        async def health_check():
-            return {"status": "healthy", "service": "ururu-ai-test"}
-            
-        @app.post("/api/v1/recommendations")
-        async def mock_recommendations():
-            await asyncio.sleep(0.1)  # 실제 AI 처리 시간 시뮬레이션
-            return {
-                "recommendations": [
-                    {"product_id": 1, "score": 0.95, "name": "테스트 상품 1"},
-                    {"product_id": 2, "score": 0.89, "name": "테스트 상품 2"}
-                ],
-                "total_count": 2,
-                "processing_time_ms": 100
-            }
-        EOF
-        
-        # 백그라운드에서 서버 실행
-        python -c "
-        import uvicorn
-        import sys
-        sys.path.append('.')
-        uvicorn.run('test_server:app', host='0.0.0.0', port=8000, log_level='warning')
-        " &
-        
-        # 서버 시작 대기
-        sleep 10
-        
-    - name: 서버 준비 상태 확인
-      run: |
-        for i in {1..30}; do
-          if curl -f http://localhost:8000/health; then
-            echo "✅ 테스트 서버가 준비되었습니다."
-            break
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 환경 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 성능 테스트 도구 설치
+        run: |
+          pip install locust==2.31.0 requests==2.32.3 fastapi==0.111.0 uvicorn==0.30.0
+
+      - name: 테스트용 FastAPI 서버 시작
+        run: |
+          # 간단한 테스트 서버 생성
+          cat > test_server.py << 'EOF'
+          from fastapi import FastAPI
+          import uvicorn
+          import asyncio
+          
+          app = FastAPI(title="Test Ururu AI Server")
+          
+          @app.get("/health")
+          async def health_check():
+              return {"status": "healthy", "service": "ururu-ai-test"}
+              
+          @app.post("/api/v1/recommendations")
+          async def mock_recommendations():
+              await asyncio.sleep(0.1)  # 실제 AI 처리 시간 시뮬레이션
+              return {
+                  "recommendations": [
+                      {"product_id": 1, "score": 0.95, "name": "테스트 상품 1"},
+                      {"product_id": 2, "score": 0.89, "name": "테스트 상품 2"}
+                  ],
+                  "total_count": 2,
+                  "processing_time_ms": 100
+              }
+          EOF
+          
+          # 백그라운드에서 서버 실행
+          python -c "
+          import uvicorn
+          import sys
+          sys.path.append('.')
+          uvicorn.run('test_server:app', host='0.0.0.0', port=8000, log_level='warning')
+          " &
+          
+          # 서버 시작 대기
+          sleep 10
+
+      - name: 서버 준비 상태 확인
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:8000/health; then
+              echo "✅ 테스트 서버가 준비되었습니다."
+              break
+            fi
+            echo "테스트 서버 시작을 기다리는 중... ($i/30)"
+            sleep 2
+          done
+
+      - name: Create Locust Performance Test File
+        run: |
+          cat > locustfile.py << 'EOF'
+          from locust import HttpUser, task, between
+          import json
+          
+          class UruruAITestUser(HttpUser):
+              wait_time = between(1, 3)
+              
+              def on_start(self):
+                  self.client.verify = False
+                  
+              @task(3)
+              def get_recommendations(self):
+                  payload = {
+                      "user_diagnosis": "I have dry skin and lack moisture",
+                      "top_k": 10,
+                      "max_price": 50000
+                  }
+                  
+                  with self.client.post(
+                      "/api/v1/recommendations",
+                      json=payload,
+                      headers={"Content-Type": "application/json"},
+                      catch_response=True
+                  ) as response:
+                      if response.status_code == 200:
+                          response.success()
+                      else:
+                          response.failure(f"Recommendation API failed: {response.status_code}")
+              
+              @task(1)
+              def health_check(self):
+                  with self.client.get("/health", catch_response=True) as response:
+                      if response.status_code == 200:
+                          response.success()
+                      else:
+                          response.failure(f"Health check failed: {response.status_code}")
+          EOF
+
+      - name: Run Performance Test
+        run: |
+          echo "🚀 Starting performance test (Users: ${{ github.event.inputs.concurrent_users }}, Time: ${{ github.event.inputs.test_duration }}s)"
+          locust \
+            --host=http://localhost:8000 \
+            --users=${{ github.event.inputs.concurrent_users }} \
+            --spawn-rate=1 \
+            --run-time=${{ github.event.inputs.test_duration }}s \
+            --headless \
+            --csv=performance_results \
+            --html=performance_report.html || echo "Performance test completed"
+
+      - name: Analyze Performance Test Results
+        run: |
+          echo "=== Performance Test Results Summary ==="
+          if [ -f performance_results_stats.csv ]; then
+            echo "📊 Request Statistics:"
+            cat performance_results_stats.csv | head -5
+            echo ""
+            echo "❌ Failure Statistics:"
+            cat performance_results_failures.csv 2>/dev/null || echo "No failures"
+          else
+            echo "⚠️ Performance test result files not found."
           fi
-          echo "테스트 서버 시작을 기다리는 중... ($i/30)"
-          sleep 2
-        done
-        
-    - name: Create Locust Performance Test File
-      run: |
-        cat > locustfile.py << 'EOF'
-        from locust import HttpUser, task, between
-        import json
-        
-        class UruruAITestUser(HttpUser):
-            wait_time = between(1, 3)
-            
-            def on_start(self):
-                self.client.verify = False
-                
-            @task(3)
-            def get_recommendations(self):
-                payload = {
-                    "user_diagnosis": "I have dry skin and lack moisture",
-                    "top_k": 10,
-                    "max_price": 50000
-                }
-                
-                with self.client.post(
-                    "/api/v1/recommendations",
-                    json=payload,
-                    headers={"Content-Type": "application/json"},
-                    catch_response=True
-                ) as response:
-                    if response.status_code == 200:
-                        response.success()
-                    else:
-                        response.failure(f"Recommendation API failed: {response.status_code}")
-            
-            @task(1)
-            def health_check(self):
-                with self.client.get("/health", catch_response=True) as response:
-                    if response.status_code == 200:
-                        response.success()
-                    else:
-                        response.failure(f"Health check failed: {response.status_code}")
-        EOF
-        
-    - name: Run Performance Test
-      run: |
-        echo "🚀 Starting performance test (Users: ${{ github.event.inputs.concurrent_users }}, Time: ${{ github.event.inputs.test_duration }}s)"
-        locust \
-          --host=http://localhost:8000 \
-          --users=${{ github.event.inputs.concurrent_users }} \
-          --spawn-rate=1 \
-          --run-time=${{ github.event.inputs.test_duration }}s \
-          --headless \
-          --csv=performance_results \
-          --html=performance_report.html || echo "Performance test completed"
           
-    - name: Analyze Performance Test Results
-      run: |
-        echo "=== Performance Test Results Summary ==="
-        if [ -f performance_results_stats.csv ]; then
-          echo "📊 Request Statistics:"
-          cat performance_results_stats.csv | head -5
           echo ""
-          echo "❌ Failure Statistics:"
-          cat performance_results_failures.csv 2>/dev/null || echo "No failures"
-        else
-          echo "⚠️ Performance test result files not found."
-        fi
-        
-        echo ""
-        echo "=== Test Environment Information ==="
-        echo "- Concurrent Users: ${{ github.event.inputs.concurrent_users }}"
-        echo "- Test Duration: ${{ github.event.inputs.test_duration }}s"
-        echo "- Server Environment: GitHub Actions (ubuntu-latest)"
-        echo "- Test Target: Mock FastAPI Server"
-        
-    - name: Upload Result Files
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: performance-test-results-${{ github.run_number }}
-        path: |
-          performance_results*.csv
-          performance_report.html
-          
-    - name: Cleanup Test Environment
-      if: always()
-      run: |
-        echo "🧹 Cleaning up test environment"
-        pkill -f "uvicorn" || echo "Server process cleanup completed"
-        echo "✅ Performance test completed!"
+          echo "=== Test Environment Information ==="
+          echo "- Concurrent Users: ${{ github.event.inputs.concurrent_users }}"
+          echo "- Test Duration: ${{ github.event.inputs.test_duration }}s"
+          echo "- Server Environment: GitHub Actions (ubuntu-latest)"
+          echo "- Test Target: Mock FastAPI Server"
+
+      - name: Upload Result Files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-test-results-${{ github.run_number }}
+          path: |
+            performance_results*.csv
+            performance_report.html
+
+      - name: Cleanup Test Environment
+        if: always()
+        run: |
+          echo "🧹 Cleaning up test environment"
+          pkill -f "uvicorn" || echo "Server process cleanup completed"
+          echo "✅ Performance test completed!"

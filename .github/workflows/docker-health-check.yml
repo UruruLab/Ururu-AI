@@ -18,82 +18,84 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-      
-    - name: Checkout Config Repository
-      uses: actions/checkout@v4
-      with:
-        repository: UruruLab/Ururu-AI-Config
-        path: config
-        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-        
-    - name: Copy Config Files (.env files)
-      run: |
-        mkdir -p ./
-        if compgen -G "config/.env*" > /dev/null; then
-          cp config/.env* ./
-          echo "✅ Config files copied successfully"
-        else
-          echo "❌ Config files not found in config repository"
-          exit 1
-        fi
-        
-    - name: Verify Environment Files
-      run: |
-        echo "📁 Checking copied environment files"
-        ls -la .env*
-        if [ -f ".env.development" ]; then
-          echo "✅ .env.development file exists"
-        else
-          echo "❌ .env.development file missing"
-        fi
-        if [ -f ".env.production" ]; then
-          echo "✅ .env.production file exists"
-        else
-          echo "❌ .env.production file missing"
-        fi
-      
-    - name: Validate Docker Compose Configuration
-      run: |
-        echo "✅ Validating Docker Compose file syntax"
-        docker compose config --quiet
-        echo "✅ Validating development environment (using copied config files)"
-        ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-        echo "✅ Validating production environment (using copied config files)"
-        ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
-        
-    - name: Verify Environment Variable Bindings
-      run: |
-        echo "🔍 Verifying environment variable bindings"
-        echo "Development environment key variables:"
-        ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 20 "environment:" | head -15 || true
-        echo ""
-        echo "Production environment key variables:"
-        ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 20 "environment:" | head -15 || true
-        
-    - name: Simulate Health Check
-      run: |
-        echo "🔍 AI Service Health Check Simulation"
-        echo "- Target: http://localhost:8000/health"
-        echo "- Expected Response: {\"status\": \"healthy\", \"service\": \"ururu-ai-recommendation\"}"
-        
-        echo "🔍 Spring Backend Connection Test Simulation"
-        echo "- Target: http://localhost:8080/health"
-        echo "- Actual connection only available in EC2 environment"
-        
-    - name: Check GitHub Container Registry Images
-      run: |
-        echo "📦 Checking latest Docker images"
-        echo "- Registry: ghcr.io/${{ github.repository }}"
-        echo "- Latest tags: latest, main, develop"
-        
-    - name: Generate Health Check Report
-      run: |
-        echo "📊 Health Check Completion Report"
-        echo "✅ Docker Compose configuration files validated"
-        echo "✅ Config repository integration working"
-        echo "✅ Environment-specific configuration files verified"
-        echo "✅ Workflow configuration validated"
-        echo "️  Actual service status needs separate verification on EC2"
-        echo "Run on EC2: docker compose ps && docker compose logs"
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Checkout Config Repository
+        uses: actions/checkout@v4
+        with:
+          repository: UruruLab/Ururu-AI-Config
+          path: config
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: Copy Config Files (.env files)
+        run: |
+          mkdir -p ./
+          if compgen -G "config/.env*" > /dev/null; then
+            cp config/.env* ./
+            echo "✅ Config files copied successfully"
+          else
+            echo "❌ Config files not found in config repository"
+            exit 1
+          fi
+
+      - name: Verify Environment Files
+        run: |
+          echo "📁 Checking copied environment files"
+          ls -la .env*
+          if [ -f ".env.development" ]; then
+            echo "✅ .env.development file exists"
+          else
+            echo "❌ .env.development file missing"
+            exit 1
+          fi
+          if [ -f ".env.production" ]; then
+            echo "✅ .env.production file exists"
+          else
+            echo "❌ .env.production file missing"
+            exit 1
+          fi
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          echo "✅ Validating Docker Compose file syntax"
+          docker compose config --quiet
+          echo "✅ Validating development environment (using copied config files)"
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
+          echo "✅ Validating production environment (using copied config files)"
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
+
+      - name: Verify Environment Variable Bindings
+        run: |
+          echo "🔍 Verifying environment variable bindings"
+          echo "Development environment key variables:"
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 20 "environment:" | head -15 || true
+          echo ""
+          echo "Production environment key variables:"
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 20 "environment:" | head -15 || true
+
+      - name: Simulate Health Check
+        run: |
+          echo "🔍 AI Service Health Check Simulation"
+          echo "- Target: http://localhost:8000/health"
+          echo "- Expected Response: {\"status\": \"healthy\", \"service\": \"ururu-ai-recommendation\"}"
+          
+          echo "🔍 Spring Backend Connection Test Simulation"
+          echo "- Target: http://localhost:8080/health"
+          echo "- Actual connection only available in EC2 environment"
+
+      - name: Check GitHub Container Registry Images
+        run: |
+          echo "📦 Checking latest Docker images"
+          echo "- Registry: ghcr.io/${{ github.repository }}"
+          echo "- Latest tags: latest, main, develop"
+
+      - name: Generate Health Check Report
+        run: |
+          echo "📊 Health Check Completion Report"
+          echo "✅ Docker Compose configuration files validated"
+          echo "✅ Config repository integration working"
+          echo "✅ Environment-specific configuration files verified"
+          echo "✅ Workflow configuration validated"
+          echo "️  Actual service status needs separate verification on EC2"
+          echo "Run on EC2: docker compose ps && docker compose logs"
