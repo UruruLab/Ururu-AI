@@ -1,9 +1,9 @@
 import logging
 import numpy as np
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, not_
+from sqlalchemy import select, and_, not_
 from sqlalchemy.orm import selectinload
 
 from app.services.faiss_service import FaissVectorStore
@@ -14,7 +14,7 @@ from app.services.product_converter import ProductConverter
 from app.models.recommendation import ProfileBasedRecommendationRequest
 from app.models.product import Product, ProductCategory
 from app.models.user import BeautyProfile
-from app.models.database import DBProduct, DBProductOption, DBCategory, DBProductCategory
+from app.models.database import DBProduct, DBCategory, DBProductCategory
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
 
