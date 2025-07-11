@@ -3,7 +3,7 @@ import logging
 from typing import List
 import numpy as np
 
-from app.models.product import Product, ProductProfile, ProductCategory
+from app.models.product import Product
 from app.services.embedding_service import EmbeddingServiceInterface
 from app.core.config import settings
 
@@ -108,29 +108,6 @@ class ProductTowerService:
         else:
             return "고가"
     
-    def extract_product_profile(self, product: Product) -> ProductProfile:
-        """상품에서 프로필 정보 추출"""
-        
-        # 피부 타입 호환성 추출
-        skin_compatibility = self._extract_skin_compatibility(product)
-        
-        # 주요 성분 추출
-        key_ingredients = self._extract_key_ingredients(product.ingredients or "")
-        
-        # 제품 효능 추출
-        benefits = self._extract_benefits(product.description or "")
-        
-        # 타겟 고민 추출
-        target_concerns = self._extract_target_concerns(product.description or "")
-        
-        return ProductProfile(
-            product_type=product.category_main,
-            skin_compatibility=skin_compatibility,
-            key_ingredients=key_ingredients,
-            benefits=benefits,
-            price_range=self._get_price_range(product.base_price),
-            target_concerns=target_concerns
-        )
     
     def _extract_skin_compatibility(self, product: Product) -> List[str]:
         """상품 설명에서 적합한 피부 타입 추출"""

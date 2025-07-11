@@ -190,10 +190,10 @@ class ProductConverter:
     async def db_to_pydantic(self, db: AsyncSession, db_product: DBProduct, 
                            db_options: List[DBProductOption] = None) -> Product:
         """DB 모델을 Pydantic 모델로 변환"""
-        
+
         # 활성화된 옵션만 필터링
         if db_options is None:
-            db_options = [opt for opt in db_product.product_options if not opt.is_deleted]
+            db_options = [opt for opt in db_product.product_options if opt.is_deleted]
         
         # 완전한 카테고리 매핑 사용
         category_main, category_sub = await self.get_category_mapping(db, db_product.id)
@@ -207,6 +207,11 @@ class ProductConverter:
             base_price = Decimal(str(first_option.price))
             ingredients = first_option.full_ingredients or ""
         
+            logger.debug(f"상품 {db_product.id} 가격 매핑: {first_option.price} -> {base_price}")
+        else:
+            logger.warning(f"상품 {db_product.id}: 활성화된 옵션이 없어 가격을 0으로 설정")
+
+
         return Product(
             id=int(db_product.id),
             name=db_product.name,
