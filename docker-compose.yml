@@ -41,9 +41,9 @@ services:
       - HTTP_RETRY_COUNT=${HTTP_RETRY_COUNT:-3}
       - HTTP_RETRY_DELAY=${HTTP_RETRY_DELAY:-1}
       - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
-      - REDIS_URL=${REDIS_URL:-redis://3.37.116.89:6379}
-      - REDIS_HOST=${REDIS_HOST:-3.37.116.89}
-      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_URL=${REDIS_URL:-}
+      - REDIS_HOST=${REDIS_HOST:-}
+      - REDIS_PORT=${REDIS_PORT:-}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     env_file:
       - ./config/.env.${ENVIRONMENT:-development}
