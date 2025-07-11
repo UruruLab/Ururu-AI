@@ -83,7 +83,7 @@ async def get_recommendations(
             )
         
         product_ids = [result["product_id"] for result in recommendation_results]
-        product_details = await recommendation_service._get_product_details_with_category_filter(product_ids)
+        product_details = await recommendation_service.get_product_details(product_ids)
         
         # 추천 결과를 RecommendedProduct 형태로 변환
         recommendations = []

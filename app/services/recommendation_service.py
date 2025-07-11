@@ -458,6 +458,9 @@ class RecommendationService:
         except Exception as e:
             logger.error(f"상품 상세 정보 조회 실패: {e}")
             return {}
+        
+    async def get_product_details(self, product_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        return await self._get_product_details_with_category_filter(product_ids)
     
 
     async def _get_category_hierarchy_mapping(self, db: AsyncSession) -> Dict[str, List[str]]:
