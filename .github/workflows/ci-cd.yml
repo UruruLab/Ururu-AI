@@ -22,15 +22,15 @@ jobs:
       GITHUB_ACTIONS: true
       
     steps:
-    - name: 코드 체크아웃
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: Python 환경 설정
+    - name: Setup Python Environment
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
-    - name: 의존성 캐시
+    - name: Cache Dependencies
       uses: actions/cache@v4
       with:
         path: ~/.cache/pip
@@ -38,21 +38,21 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
           
-    - name: 의존성 설치
+    - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # 먼저 테스트 도구들 설치 (pytest-env 추가)
+        # Install test tools first (including pytest-env)
         pip install pytest==8.3.4 pytest-asyncio==0.25.0 pytest-env==1.1.5 flake8==7.1.1 black==25.1.0 isort==5.13.2
-        # 그 다음 프로젝트 의존성 설치
+        # Then install project dependencies
         pip install -r requirements.txt
         
-    - name: 코드 품질 검사
+    - name: Code Quality Check
       run: |
-        # 중요한 구문 오류만 체크
+        # Check only critical syntax errors
         flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics --exit-zero
-        echo "코드 품질 검사 완료"
+        echo "Code quality check completed"
         
-    - name: 테스트 실행
+    - name: Run Tests
       run: |
         export APP_NAME="Ururu AI Recommendation System"
         export EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
@@ -66,20 +66,20 @@ jobs:
     if: github.event_name == 'push'
     
     steps:
-    - name: 코드 체크아웃
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: Docker Buildx 설정
+    - name: Setup Docker Buildx
       uses: docker/setup-buildx-action@v3
       
-    - name: 컨테이너 레지스트리 로그인
+    - name: Login to Container Registry
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ secrets.GHCR_USERNAME }}
         password: ${{ secrets.GHCR_TOKEN }}
         
-    - name: 메타데이터 추출
+    - name: Extract Metadata
       id: meta
       uses: docker/metadata-action@v5
       with:
@@ -90,7 +90,7 @@ jobs:
           type=sha,prefix=sha-
           type=raw,value=latest,enable={{is_default_branch}}
           
-    - name: Docker 이미지 빌드 및 푸시
+    - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -108,34 +108,36 @@ jobs:
     environment: development
     
     steps:
-    - name: 코드 체크아웃
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: Config 레포지토리 체크아웃
+    - name: Checkout Config Repository
       uses: actions/checkout@v4
       with:
         repository: UruruLab/Ururu-AI-Config
         path: config
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         
-    - name: 개발 환경 Config 파일 복사
+    - name: Copy Development Environment Config Files
       run: |
         cp config/.env.development .env.development
-        echo "✅ 개발환경 Config 파일 복사 완료"
+        echo "✅ Development environment config files copied successfully"
         
-    - name: Docker Compose 설정 검증
+    - name: Validate Docker Compose Configuration
       run: |
-        echo "개발 환경 설정 파일 검증"
-        echo "docker-compose.development.yml 구문 검증"
+        echo "Validating development environment configuration files"
+        echo "Validating docker-compose.development.yml syntax"
         ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-        echo "개발 환경 배포 준비 완료"
+        echo "Verifying environment variable bindings"
+        ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 10 "environment:" || true
+        echo "Development environment deployment preparation completed"
         
-    - name: 배포 시뮬레이션 (실제 EC2 배포 없음)
+    - name: Simulate Deployment (No actual EC2 deployment)
       run: |
-        echo "개발 환경 배포 시뮬레이션"
-        echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        echo "- Config 파일: .env.development (Config 레포지토리에서 가져옴)"
-        echo "개발 환경 배포 설정 완료"
+        echo "Development environment deployment simulation"
+        echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
+        echo "- Config File: .env.development (fetched from Config repository)"
+        echo "Development environment deployment configuration completed"
 
   deploy-production:
     needs: build-and-push
@@ -144,38 +146,40 @@ jobs:
     environment: production
     
     steps:
-    - name: 코드 체크아웃
+    - name: Checkout Code
       uses: actions/checkout@v4
       
-    - name: Config 레포지토리 체크아웃
+    - name: Checkout Config Repository
       uses: actions/checkout@v4
       with:
         repository: UruruLab/Ururu-AI-Config
         path: config
         token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         
-    - name: 운영 환경 Config 파일 복사
+    - name: Copy Production Environment Config Files
       run: |
         cp config/.env.production .env.production
-        echo "✅ 운영환경 Config 파일 복사 완료"
+        echo "✅ Production environment config files copied successfully"
         
-    - name: Docker Compose 설정 검증
+    - name: Validate Docker Compose Configuration
       run: |
-        echo "운영 환경 설정 파일 검증"
-        echo "docker-compose.production.yml 구문 검증"
+        echo "Validating production environment configuration files"
+        echo "Validating docker-compose.production.yml syntax"
         ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
-        echo "운영 환경 배포 준비 완료"
+        echo "Verifying environment variable bindings"
+        ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 10 "environment:" || true
+        echo "Production environment deployment preparation completed"
         
-    - name: 배포 알림 준비
+    - name: Prepare Deployment Notification
       run: |
-        echo "운영 환경 배포 준비 완료"
-        echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        echo "- Config 파일: .env.production (Config 레포지토리에서 가져옴)"
-        echo "실제 EC2 배포는 별도 프로세스에서 진행"
+        echo "Production environment deployment preparation completed"
+        echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+        echo "- Config File: .env.production (fetched from Config repository)"
+        echo "Actual EC2 deployment will be handled by separate process"
         
-    - name: 배포 완료 알림
+    - name: Deployment Completion Notification
       if: success()
       run: |
-        echo "GitHub Actions 배포 파이프라인이 성공적으로 완료되었습니다."
-        echo "Docker 이미지가 GitHub Container Registry에 푸시되었습니다."
-        echo "EC2 서버에서 수동으로 docker compose pull && docker compose up -d 실행이 필요합니다."
+        echo "GitHub Actions deployment pipeline completed successfully."
+        echo "Docker image has been pushed to GitHub Container Registry."
+        echo "Manual execution required on EC2 server: docker compose pull && docker compose up -d"

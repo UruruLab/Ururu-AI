@@ -1,17 +1,23 @@
-version: '3.8'
-
 services:
   ururu-ai:
     build:
       target: production
     environment:
-      - DEBUG=false
-      - LOG_LEVEL=INFO
-      # 운영환경에서는 Spring Boot 서버 IP/도메인으로 설정
-      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://api.ururu.shop}
-      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-4}
+      - ENVIRONMENT=production
+      - SPRING_BOOT_INTEGRATION_ENABLED=true  # 운영환경에서는 Spring Boot 연동 필수
+      - USE_MOCK_DATA=false  # 실제 데이터 사용
+    env_file:
+      - .env.production
     ports:
       - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근 가능
+    networks:
+      - ururu-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     deploy:
       replicas: 2
       resources:
@@ -40,3 +46,4 @@ services:
 networks:
   ururu-network:
     driver: bridge
+    name: ururu-network

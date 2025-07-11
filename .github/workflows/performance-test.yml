@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       test_duration:
-        description: '테스트 실행 시간 (초)'
+        description: 'Test execution time (seconds)'
         required: true
         default: '60'
         type: string
       concurrent_users:
-        description: '동시 사용자 수'
+        description: 'Number of concurrent users'
         required: true
         default: '5'
         type: string
@@ -80,7 +80,7 @@ jobs:
           sleep 2
         done
         
-    - name: Locust 성능 테스트 파일 생성
+    - name: Create Locust Performance Test File
       run: |
         cat > locustfile.py << 'EOF'
         from locust import HttpUser, task, between
@@ -95,7 +95,7 @@ jobs:
             @task(3)
             def get_recommendations(self):
                 payload = {
-                    "user_diagnosis": "건성 피부로 수분이 부족해요",
+                    "user_diagnosis": "I have dry skin and lack moisture",
                     "top_k": 10,
                     "max_price": 50000
                 }
@@ -109,7 +109,7 @@ jobs:
                     if response.status_code == 200:
                         response.success()
                     else:
-                        response.failure(f"추천 API 실패: {response.status_code}")
+                        response.failure(f"Recommendation API failed: {response.status_code}")
             
             @task(1)
             def health_check(self):
@@ -117,12 +117,12 @@ jobs:
                     if response.status_code == 200:
                         response.success()
                     else:
-                        response.failure(f"헬스체크 실패: {response.status_code}")
+                        response.failure(f"Health check failed: {response.status_code}")
         EOF
         
-    - name: 성능 테스트 실행
+    - name: Run Performance Test
       run: |
-        echo "🚀 성능 테스트 시작 (사용자: ${{ github.event.inputs.concurrent_users }}, 시간: ${{ github.event.inputs.test_duration }}초)"
+        echo "🚀 Starting performance test (Users: ${{ github.event.inputs.concurrent_users }}, Time: ${{ github.event.inputs.test_duration }}s)"
         locust \
           --host=http://localhost:8000 \
           --users=${{ github.event.inputs.concurrent_users }} \
@@ -130,29 +130,29 @@ jobs:
           --run-time=${{ github.event.inputs.test_duration }}s \
           --headless \
           --csv=performance_results \
-          --html=performance_report.html || echo "성능 테스트 완료"
+          --html=performance_report.html || echo "Performance test completed"
           
-    - name: 성능 테스트 결과 분석
+    - name: Analyze Performance Test Results
       run: |
-        echo "=== 성능 테스트 결과 요약 ==="
+        echo "=== Performance Test Results Summary ==="
         if [ -f performance_results_stats.csv ]; then
-          echo "📊 요청 통계:"
+          echo "📊 Request Statistics:"
           cat performance_results_stats.csv | head -5
           echo ""
-          echo "❌ 실패 통계:"
-          cat performance_results_failures.csv 2>/dev/null || echo "실패 없음"
+          echo "❌ Failure Statistics:"
+          cat performance_results_failures.csv 2>/dev/null || echo "No failures"
         else
-          echo "⚠️ 성능 테스트 결과 파일을 찾을 수 없습니다."
+          echo "⚠️ Performance test result files not found."
         fi
         
         echo ""
-        echo "=== 테스트 환경 정보 ==="
-        echo "- 동시 사용자 수: ${{ github.event.inputs.concurrent_users }}"
-        echo "- 테스트 시간: ${{ github.event.inputs.test_duration }}초"
-        echo "- 서버 환경: GitHub Actions (ubuntu-latest)"
-        echo "- 테스트 대상: Mock FastAPI 서버"
+        echo "=== Test Environment Information ==="
+        echo "- Concurrent Users: ${{ github.event.inputs.concurrent_users }}"
+        echo "- Test Duration: ${{ github.event.inputs.test_duration }}s"
+        echo "- Server Environment: GitHub Actions (ubuntu-latest)"
+        echo "- Test Target: Mock FastAPI Server"
         
-    - name: 결과 파일 업로드
+    - name: Upload Result Files
       uses: actions/upload-artifact@v4
       if: always()
       with:
@@ -161,9 +161,9 @@ jobs:
           performance_results*.csv
           performance_report.html
           
-    - name: 테스트 완료 정리
+    - name: Cleanup Test Environment
       if: always()
       run: |
-        echo "🧹 테스트 환경 정리"
-        pkill -f "uvicorn" || echo "서버 프로세스 정리 완료"
-        echo "✅ 성능 테스트가 완료되었습니다!"
+        echo "🧹 Cleaning up test environment"
+        pkill -f "uvicorn" || echo "Server process cleanup completed"
+        echo "✅ Performance test completed!"
