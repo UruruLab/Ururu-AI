@@ -605,19 +605,6 @@ class RecommendationService:
         return max(0.0, min(1.0, match_score))
     
     
-    def _passes_price_filter(
-        self, 
-        product: Product, 
-        beauty_profile: BeautyProfile,
-        use_price_filter: bool
-    ) -> bool:
-        """프로필 기반 가격 필터"""
-        if not use_price_filter:
-            return True
-        
-        product_price = float(product.base_price)
-        return beauty_profile.min_price <= product_price <= beauty_profile.max_price
-    
     def _calculate_confidence_score(self, similarity_score: float, profile_match_score: float, rank: int) -> float:
         """신뢰도 점수 계산"""
         base_confidence = (similarity_score * 0.6 + profile_match_score * 0.4)
