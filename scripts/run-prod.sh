@@ -8,6 +8,13 @@ echo "데이터: 실제 데이터베이스 사용"
 export ENVIRONMENT=production
 export BUILD_TARGET=production
 
+# 환경 파일 존재 확인
+if [ ! -f ".env.production" ]; then
+    echo "❌ .env.production 파일을 찾을 수 없습니다."
+    echo "💡 Config 레포지토리에서 환경 파일을 가져와주세요."
+    exit 1
+fi
+
 # Spring Boot 연결 확인
 echo "🔍 Spring Boot 서버 연결 확인 중..."
 if curl -f --connect-timeout 5 http://localhost:8080/health 2>/dev/null; then

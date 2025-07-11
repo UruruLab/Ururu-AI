@@ -31,8 +31,13 @@ jobs:
     - name: Copy Config Files (.env files)
       run: |
         mkdir -p ./
-        cp config/.env* ./
-        echo "✅ Config files copied successfully"
+        if [ -f "config/.env" ]; then
+          cp config/.env* ./
+          echo "✅ Config files copied successfully"
+        else
+          echo "❌ Config files not found in config repository"
+          exit 1
+        fi
         
     - name: Verify Environment Files
       run: |

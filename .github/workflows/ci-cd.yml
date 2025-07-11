@@ -120,8 +120,13 @@ jobs:
         
     - name: Copy Development Environment Config Files
       run: |
-        cp config/.env.development .env.development
-        echo "✅ Development environment config files copied successfully"
+        if [ -f "config/.env.development" ]; then
+          cp config/.env.development .env.development
+          echo "✅ Development environment config files copied successfully"
+        else
+          echo "❌ .env.development not found in config repository"
+          exit 1
+        fi
         
     - name: Validate Docker Compose Configuration
       run: |
@@ -158,8 +163,13 @@ jobs:
         
     - name: Copy Production Environment Config Files
       run: |
-        cp config/.env.production .env.production
-        echo "✅ Production environment config files copied successfully"
+        if [ -f "config/.env.production" ]; then
+          cp config/.env.production .env.production
+          echo "✅ Production environment config files copied successfully"
+        else
+          echo "❌ .env.production not found in config repository"
+          exit 1
+        fi
         
     - name: Validate Docker Compose Configuration
       run: |
