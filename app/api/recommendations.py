@@ -82,15 +82,16 @@ async def get_recommendations(
                 request_info=request
             )
         
+        product_ids = [result["product_id"] for result in recommendation_results]
+        product_details = await recommendation_service._get_product_details_with_category_filter(product_ids)
+        
         # 추천 결과를 RecommendedProduct 형태로 변환
         recommendations = []
         for result in recommendation_results:
             try:
-                # recommendation_service에서 반환된 결과를 파싱
-                product_details = await recommendation_service._get_product_details_with_category_filter([result["product_id"]])
-                
-                if result["product_id"] in product_details:
-                    product_info = product_details[result["product_id"]]
+                product_id = result["product_id"]                
+                if product_id in product_details:
+                    product_info = product_details[product_id]
                     
                     recommended_product = RecommendedProduct(
                         product=product_info["product"],
@@ -103,6 +104,8 @@ async def get_recommendations(
                         confidence_level=result.get("confidence_level", "medium")
                     )
                     recommendations.append(recommended_product)
+                else:
+                    logger.warning(f"상품 정보를 찾을 수 없음: product_id={product_id}")
                     
             except Exception as e:
                 logger.error(f"프로필 추천 결과 변환 실패 (product_id: {result.get('product_id')}): {e}")
