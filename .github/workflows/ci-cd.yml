@@ -111,24 +111,30 @@ jobs:
     - name: 코드 체크아웃
       uses: actions/checkout@v4
       
-    - name: 개발 환경 배포 설정
+    - name: Config 레포지토리 체크아웃
+      uses: actions/checkout@v4
+      with:
+        repository: UruruLab/Ururu-AI-Config
+        path: config
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 개발 환경 Config 파일 복사
       run: |
-        printf 'SPRING_BOOT_BASE_URL=%s\n' "${{ secrets.DEV_SPRING_BACKEND_URL }}" >> .env.development
-        printf 'REDIS_URL=%s\n' "${{ secrets.DEV_REDIS_URL }}" >> .env.development
+        cp config/.env.development .env.development
+        echo "✅ 개발환경 Config 파일 복사 완료"
         
     - name: Docker Compose 설정 검증
       run: |
         echo "개발 환경 설정 파일 검증"
         echo "docker-compose.development.yml 구문 검증"
-        docker compose -f docker-compose.development.yml config --quiet
+        ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
         echo "개발 환경 배포 준비 완료"
         
     - name: 배포 시뮬레이션 (실제 EC2 배포 없음)
       run: |
         echo "개발 환경 배포 시뮬레이션"
         echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-        echo "- Spring Boot URL: [MASKED]"
-        echo "- Redis URL: [MASKED]"
+        echo "- Config 파일: .env.development (Config 레포지토리에서 가져옴)"
         echo "개발 환경 배포 설정 완료"
 
   deploy-production:
@@ -141,24 +147,30 @@ jobs:
     - name: 코드 체크아웃
       uses: actions/checkout@v4
       
-    - name: 운영 환경 배포 설정
+    - name: Config 레포지토리 체크아웃
+      uses: actions/checkout@v4
+      with:
+        repository: UruruLab/Ururu-AI-Config
+        path: config
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: 운영 환경 Config 파일 복사
       run: |
-        printf 'SPRING_BOOT_BASE_URL=%s\n' "${{ secrets.PROD_SPRING_BACKEND_URL }}" >> .env.production
-        printf 'REDIS_URL=%s\n' "${{ secrets.PROD_REDIS_URL }}" >> .env.production
+        cp config/.env.production .env.production
+        echo "✅ 운영환경 Config 파일 복사 완료"
         
     - name: Docker Compose 설정 검증
       run: |
         echo "운영 환경 설정 파일 검증"
         echo "docker-compose.production.yml 구문 검증"
-        docker compose -f docker-compose.production.yml config --quiet
+        ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
         echo "운영 환경 배포 준비 완료"
         
     - name: 배포 알림 준비
       run: |
         echo "운영 환경 배포 준비 완료"
         echo "- Docker 이미지: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-        echo "- Spring Boot URL: [MASKED]"
-        echo "- Redis URL: [MASKED]"
+        echo "- Config 파일: .env.production (Config 레포지토리에서 가져옴)"
         echo "실제 EC2 배포는 별도 프로세스에서 진행"
         
     - name: 배포 완료 알림

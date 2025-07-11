@@ -4,6 +4,14 @@ on:
   schedule:
     - cron: '0 */6 * * *'
   workflow_dispatch:
+  push:
+    branches: 
+      - main
+      - 'fix/*'
+  pull_request:
+    branches: 
+      - main
+      - 'fix/*'
 
 jobs:
   health-check:
@@ -13,14 +21,42 @@ jobs:
     - name: 코드 체크아웃
       uses: actions/checkout@v4
       
+    - name: Config 레포지토리 체크아웃
+      uses: actions/checkout@v4
+      with:
+        repository: UruruLab/Ururu-AI-Config
+        path: config
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Config 파일 복사 (.env 파일들)
+      run: |
+        mkdir -p ./
+        cp config/.env* ./
+        echo "✅ Config 파일 복사 완료"
+        
+    - name: 환경 파일 확인
+      run: |
+        echo "📁 복사된 환경 파일 확인"
+        ls -la .env*
+        if [ -f ".env.development" ]; then
+          echo "✅ .env.development 파일 존재"
+        else
+          echo "❌ .env.development 파일 없음"
+        fi
+        if [ -f ".env.production" ]; then
+          echo "✅ .env.production 파일 존재"
+        else
+          echo "❌ .env.production 파일 없음"
+        fi
+      
     - name: Docker Compose 설정 검증
       run: |
         echo "✅ Docker Compose 파일 구문 검증"
         docker compose config --quiet
-        echo "✅ 개발환경 설정 검증"
-        docker compose -f docker-compose.development.yml config --quiet
-        echo "✅ 운영환경 설정 검증"  
-        docker compose -f docker-compose.production.yml config --quiet
+        echo "✅ 개발환경 설정 검증 (복사된 Config 파일 사용)"
+        ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
+        echo "✅ 운영환경 설정 검증 (복사된 Config 파일 사용)"
+        ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
         
     - name: 헬스체크 시뮬레이션
       run: |
@@ -42,6 +78,8 @@ jobs:
       run: |
         echo "📊 헬스체크 완료 보고서"
         echo "✅ Docker Compose 설정 파일 정상"
+        echo "✅ Config 레포지토리 연동 정상"
+        echo "✅ 환경별 설정 파일 검증 완료"
         echo "✅ 워크플로우 설정 정상"
         echo "⚠️  실제 서비스 상태는 EC2에서 별도 확인 필요"
         echo "💡 EC2에서 실행: docker compose ps && docker compose logs"
