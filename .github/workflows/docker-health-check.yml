@@ -31,7 +31,7 @@ jobs:
     - name: Copy Config Files (.env files)
       run: |
         mkdir -p ./
-        if [ -f "config/.env" ]; then
+        if compgen -G "config/.env*" > /dev/null; then
           cp config/.env* ./
           echo "✅ Config files copied successfully"
         else
