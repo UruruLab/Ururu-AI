@@ -139,7 +139,10 @@ jobs:
           echo "Validating docker-compose.development.yml syntax"
           ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
           echo "Verifying environment variable bindings"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 10 "environment:" || true
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config \
+            | grep -A 10 "environment:" \
+            | grep "^[[:space:]]*[[:alpha:]]" \
+            | sed 's/.*$/&<redacted>/' || true
           echo "Development environment deployment preparation completed"
 
       - name: Simulate Deployment (No actual EC2 deployment)
@@ -187,7 +190,10 @@ jobs:
           echo "Validating docker-compose.production.yml syntax"
           ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
           echo "Verifying environment variable bindings"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 10 "environment:" || true
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config \
+            | grep -A 10 "environment:" \
+            | grep "^[[:space:]]*[[:alpha:]]" \
+            | sed 's/.*$/&<redacted>/' || true
           echo "Production environment deployment preparation completed"
 
       - name: Prepare Deployment Notification

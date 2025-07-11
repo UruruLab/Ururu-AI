@@ -69,10 +69,18 @@ jobs:
         run: |
           echo "🔍 Verifying environment variable bindings"
           echo "Development environment key variables:"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config | grep -A 20 "environment:" | head -15 || true
+          ENVIRONMENT=development docker compose -f docker-compose.development.yml config \
+            | grep -A 20 "environment:" \
+            | grep "^[[:space:]]*[[:alpha:]]" \
+            | sed 's/.*$/&<redacted>/' \
+            | head -10
           echo ""
           echo "Production environment key variables:"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config | grep -A 20 "environment:" | head -15 || true
+          ENVIRONMENT=production docker compose -f docker-compose.production.yml config \
+            | grep -A 20 "environment:" \
+            | grep "^[[:space:]]*[[:alpha:]]" \
+            | sed 's/.*$/&<redacted>/' \
+            | head -10
 
       - name: Simulate Health Check
         run: |
