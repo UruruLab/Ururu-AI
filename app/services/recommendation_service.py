@@ -513,7 +513,7 @@ class RecommendationService:
                 ]
             }
             
-            logger.info(f"🏗️ 카테고리 계층 매핑 생성 완료")
+            logger.info("🏗️ 카테고리 계층 매핑 생성 완료")
             return category_mapping
             
         except Exception as e:
