@@ -26,7 +26,7 @@ jobs:
       with:
         repository: UruruLab/Ururu-AI-Config
         path: config
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         
     - name: Config 파일 복사 (.env 파일들)
       run: |

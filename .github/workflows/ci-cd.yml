@@ -116,7 +116,7 @@ jobs:
       with:
         repository: UruruLab/Ururu-AI-Config
         path: config
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         
     - name: 개발 환경 Config 파일 복사
       run: |
@@ -152,7 +152,7 @@ jobs:
       with:
         repository: UruruLab/Ururu-AI-Config
         path: config
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PRIVATE_REPO_TOKEN }}
         
     - name: 운영 환경 Config 파일 복사
       run: |
