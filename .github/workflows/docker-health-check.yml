@@ -5,11 +5,11 @@ on:
     - cron: '0 */6 * * *'
   workflow_dispatch:
   push:
-    branches: 
+    branches:
       - main
       - 'fix/*'
   pull_request:
-    branches: 
+    branches:
       - main
       - 'fix/*'
 
@@ -26,14 +26,21 @@ jobs:
         with:
           repository: UruruLab/Ururu-AI-Config
           path: config
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          token: ${{ secrets.GHCR_TOKEN }}
 
-      - name: Copy Config Files (.env files)
+      - name: Copy Config Files to Docker Context
         run: |
-          mkdir -p ./
+          # Docker 디렉토리 내에 config 폴더 생성
+          mkdir -p ./docker/config
+          
+          # config repository의 .env 파일들을 docker/config에 복사
           if compgen -G "config/.env*" > /dev/null; then
-            cp config/.env* ./
-            echo "✅ Config files copied successfully"
+            cp config/.env* ./docker/config/
+            echo "✅ Config files copied to docker/config/ successfully"
+          
+            # 복사된 파일 확인
+            echo "📁 Copied files:"
+            ls -la ./docker/config/
           else
             echo "❌ Config files not found in config repository"
             exit 1
@@ -41,18 +48,20 @@ jobs:
 
       - name: Verify Environment Files
         run: |
-          echo "📁 Checking copied environment files"
-          ls -la .env*
-          if [ -f ".env.development" ]; then
-            echo "✅ .env.development file exists"
+          echo "📁 Checking Docker context config files"
+          ls -la ./docker/config/
+          
+          if [ -f "./docker/config/.env.development" ]; then
+            echo "✅ .env.development file exists in docker context"
           else
-            echo "❌ .env.development file missing"
+            echo "❌ .env.development file missing in docker context"
             exit 1
           fi
-          if [ -f ".env.production" ]; then
-            echo "✅ .env.production file exists"
+          
+          if [ -f "./docker/config/.env.production" ]; then
+            echo "✅ .env.production file exists in docker context"
           else
-            echo "❌ .env.production file missing"
+            echo "❌ .env.production file missing in docker context"
             exit 1
           fi
 
@@ -61,14 +70,23 @@ jobs:
           echo "✅ Validating main Docker Compose file syntax"
           cd docker && docker compose config --quiet
           echo "✅ Docker Compose validation completed"
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          ENVIRONMENT: production
 
       - name: Verify Environment Variable Bindings
         run: |
           echo "🔍 Verifying environment variable bindings"
-          echo "Production environment validation:"
-          cd docker && ENVIRONMENT=production docker compose config \
+          cd docker
+          echo "Production environment configuration check:"
+          ENVIRONMENT=production GHCR_TOKEN=${{ secrets.GHCR_TOKEN }} \
+            docker compose config \
             | grep -A 10 "environment:" \
-            | head -10 || echo "Environment validation completed"
+            | grep "^[[:space:]]*[[:alpha:]]" \
+            | sed 's/=.*/=<redacted>/' \
+            | head -10
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
 
       - name: Simulate Health Check
         run: |
@@ -77,14 +95,24 @@ jobs:
           echo "- Expected Response: {\"status\": \"healthy\", \"service\": \"ururu-ai-recommendation\"}"
           
           echo "🔍 Spring Backend Connection Test Simulation"
-          echo "- Target: http://localhost:8080/health"
-          echo "- Actual connection only available in EC2 environment"
+          echo "- VPC Target: http://10.0.5.114:8000/health (FastAPI EC2)"
+          echo "- Actual connection only available in VPC environment"
 
-      - name: Check GitHub Container Registry Images
+      - name: Check Configuration Completeness
         run: |
-          echo "📦 Checking latest Docker images"
-          echo "- Registry: ghcr.io/${{ github.repository }}"
-          echo "- Latest tags: latest, main, develop"
+          echo "📦 Checking configuration completeness"
+          echo "- Docker Compose files: ✅"
+          echo "- Environment files: ✅"
+          echo "- Config repository integration: ✅"
+          
+          # 환경별 필수 변수 체크
+          echo "🔍 Checking required environment variables"
+          cd docker
+          if grep -q "SPRING_BOOT_BASE_URL" config/.env.production; then
+            echo "✅ SPRING_BOOT_BASE_URL configured"
+          else
+            echo "⚠️ SPRING_BOOT_BASE_URL not found in production config"
+          fi
 
       - name: Generate Health Check Report
         run: |
@@ -93,5 +121,11 @@ jobs:
           echo "✅ Config repository integration working"
           echo "✅ Environment-specific configuration files verified"
           echo "✅ Workflow configuration validated"
-          echo "️  Actual service status needs separate verification on EC2"
-          echo "Run on EC2: docker compose ps && docker compose logs"
+          echo "✅ File path mapping corrected"
+          echo "⚠️ Actual service status needs verification on EC2"
+          echo ""
+          echo "🔧 Next steps for deployment:"
+          echo "1. Ensure FastAPI EC2 (10.0.5.114) is running"
+          echo "2. Test VPC internal communication"
+          echo "3. Run: git push origin main to trigger CI/CD"
+          echo "4. Monitor deployment: docker compose ps && docker compose logs"
