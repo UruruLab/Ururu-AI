@@ -94,58 +94,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-development:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: development
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Checkout Config Repository
-        uses: actions/checkout@v4
-        with:
-          repository: UruruLab/Ururu-AI-Config
-          path: config
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-
-      - name: Copy Development Environment Config Files
-        run: |
-          if compgen -G "config/.env*" > /dev/null; then
-            if [ -f "config/.env.development" ]; then
-              cp config/.env.development .env.development
-              echo "✅ Development environment config files copied successfully"
-            else
-              echo "❌ .env.development not found in config repository"
-              exit 1
-            fi
-          else
-            echo "❌ No config files found in config repository"
-            exit 1
-          fi
-
-      - name: Validate Docker Compose Configuration
-        run: |
-          echo "Validating development environment configuration files"
-          echo "Validating docker-compose.development.yml syntax"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-          echo "Development environment deployment preparation completed"
-
-      - name: Simulate Deployment (No actual EC2 deployment)
-        run: |
-          echo "Development environment deployment simulation"
-          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-          echo "- Config File: .env.development (fetched from Config repository)"
-          echo "Development environment deployment configuration completed"
+  # Development 배포는 VPC 내부 통신에서 불필요하므로 제거
 
   deploy-production:
     needs: build-and-push
@@ -184,80 +140,94 @@ jobs:
           echo "Validating production environment configuration files"
           echo "Production environment deployment preparation completed"
 
-      - name: Deploy to Production EC2
+      - name: Deploy to FastAPI Production EC2
         uses: appleboy/ssh-action@v0.1.6
         with:
-          host: ${{ secrets.PROD_EC2_HOST }}
-          username: ${{ secrets.PROD_EC2_USER }}
-          key: ${{ secrets.PROD_EC2_SSH_KEY }}
+          host: ${{ secrets.AI_EC2_HOST }}          # 새로운 FastAPI EC2
+          username: ${{ secrets.AI_EC2_USER }}      # ec2-user
+          key: ${{ secrets.AI_EC2_SSH_KEY }}        # 새로운 EC2 키
           port: 22
           timeout: 600s
           script: |
             set -e
-            echo "Production AI service deployment started"
+            echo "🚀 FastAPI AI 서비스 배포 시작"
             
+            # 기존 컨테이너 상태 확인
             if docker ps | grep ururu-ai-service; then
-              echo "Existing AI service found"
-              docker logs --tail 5 ururu-ai-service
+              echo "📊 기존 AI 서비스 로그 확인"
+              docker logs --tail 10 ururu-ai-service
             fi
             
-            cd /home/ec2-user/Ururu-AI
-            git fetch origin
-            git checkout main
-            git reset --hard origin/main
-            echo "Code update completed"
+            # 코드 업데이트 (올바른 디렉토리)
+            cd /home/ec2-user/ururu-ai
+            if [ ! -d ".git" ]; then
+              echo "📥 레포지토리 초기 클론"
+              git clone https://github.com/UruruLab/Ururu-AI.git .
+            else
+              echo "🔄 코드 업데이트"
+              git fetch origin
+              git checkout main
+              git reset --hard origin/main
+            fi
             
-            docker build -t ururu-ai:latest .
-            echo "Docker image build completed"
+            # 환경변수 설정
+            echo "📝 환경변수 설정"
+            cat > .env.production << EOF
+            ENVIRONMENT=production
+            AI_PORT=8000
+            SPRING_BOOT_BASE_URL=http://${{ secrets.SPRING_BOOT_PRIVATE_IP }}:8080
+            BUILD_TARGET=production
+            EOF
             
-            cd /home/ec2-user/app
-            docker compose -f docker-compose-prod.yml stop ururu-ai || true
-            docker compose -f docker-compose-prod.yml up -d ururu-ai
-            echo "AI service restart completed"
+            # Docker 컨테이너 배포
+            echo "🐳 Docker 컨테이너 배포"
+            cd docker
+            docker compose down || true
+            docker compose up -d --build
             
-            echo "Waiting for service to be ready..."
+            echo "⏳ 서비스 시작 대기 중..."
+            sleep 30
+            
+            # 헬스체크
+            echo "🔍 헬스체크 시작"
             for i in {1..60}; do
               if curl -f http://localhost:8000/health 2>/dev/null; then
-                echo "AI service is healthy"
+                echo "✅ FastAPI 서비스 헬스체크 통과"
                 break
               fi
               if [ $i -eq 60 ]; then
-                echo "Health check failed"
-                docker logs --tail 10 ururu-ai-service
+                echo "❌ 헬스체크 실패"
+                docker logs --tail 20 ururu-ai-service
                 exit 1
               fi
               sleep 5
             done
             
-            if curl -f http://localhost:8000/api/recommendations/spring-health 2>/dev/null; then
-              echo "Spring Boot integration verified"
-            else
-              echo "Spring Boot integration check failed"
-              docker logs --tail 5 ururu-ai-service
-            fi
-            
+            # 벡터 인덱스 상태 확인
+            echo "📊 벡터 인덱스 상태 확인"
             VECTOR_STATUS=$(curl -s http://localhost:8000/api/vector/status | grep -o '"total_vectors":[0-9]*' | cut -d':' -f2 || echo "0")
-            echo "Vector index status: $VECTOR_STATUS vectors"
+            echo "벡터 인덱스 상태: $VECTOR_STATUS 개 벡터"
             
+            # 임베딩 재생성 (필요시)
             if [ "$VECTOR_STATUS" -lt 1000 ]; then
-              echo "Vector count low, triggering embedding regeneration"
-              curl -X POST "http://localhost:8000/api/vector/embeddings/batch?batch_size=100&force_recreate=false" || echo "Embedding regeneration request failed"
+              echo "🔄 벡터 인덱스 재생성 시작"
+              curl -X POST "http://localhost:8000/api/vector/embeddings/batch?batch_size=100&force_recreate=false" || echo "임베딩 재생성 요청 실패"
             fi
             
-            echo "Production AI service deployment completed"
-            echo "$(date): AI service deployed - commit: $GITHUB_SHA" >> /home/ec2-user/deployment.log
+            echo "🎉 FastAPI AI 서비스 배포 완료"
+            echo "$(date): FastAPI AI 서비스 배포 완료 - commit: $GITHUB_SHA" >> /home/ec2-user/deployment.log
 
       - name: Deployment Notification
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "Production AI service deployment successful"
-            echo "AI Service: http://3.39.69.34:8000"
-            echo "API Documentation: http://3.39.69.34:8000/docs"
-            echo "AI recommendation service is now available"
+            echo "✅ FastAPI AI 서비스 배포 성공"
+            echo "🌐 AI 서비스: http://43.200.204.67:8000"
+            echo "📚 API 문서: http://43.200.204.67:8000/docs"
+            echo "🔗 Spring Boot 연동 준비 완료"
           else
-            echo "Production AI service deployment failed"
-            echo "Check EC2 logs: docker logs ururu-ai-service"
+            echo "❌ FastAPI AI 서비스 배포 실패"
+            echo "📝 로그 확인: docker logs ururu-ai-service"
           fi
 
       - name: Create Deployment Issue on Failure

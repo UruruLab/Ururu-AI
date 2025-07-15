@@ -22,7 +22,7 @@ services:
   ururu-ai:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
       target: ${BUILD_TARGET:-production}
     container_name: ururu-ai-service
     ports:
@@ -32,8 +32,8 @@ services:
       - ./config:/app/config:ro
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
-      # 컨테이너에서 호스트의 Spring Boot에 접근하기 위한 설정
-      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://host.docker.internal:8080}
+      # VPC 내부에서 Spring Boot EC2와 통신
+      - SPRING_BOOT_BASE_URL=${SPRING_BOOT_BASE_URL:-http://10.0.X.X:8080}
     env_file:
       - ./config/.env.${ENVIRONMENT:-production}
     depends_on:

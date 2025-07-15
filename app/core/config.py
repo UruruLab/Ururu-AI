@@ -52,6 +52,17 @@ class Settings(BaseSettings):
     HTTP_RETRY_COUNT: int = 3
     HTTP_RETRY_DELAY: float = 1.0
     
+    # 개발용 설정 (선택적)
+    SPRING_BOOT_INTEGRATION_ENABLED: bool = False
+    USE_MOCK_DATA: bool = True
+    MOCK_PRODUCTS_COUNT: int = 100
+    
+    # Redis 설정 (선택적)
+    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
+    
     # 로깅 설정 (환경변수에서만 가져옴)
     LOG_LEVEL: str
     LOG_FORMAT: str
