@@ -118,7 +118,7 @@ jobs:
         with:
           repository: UruruLab/Ururu-AI-Config
           path: config
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          token: ${{ secrets.GHCR_TOKEN }}
 
       - name: Copy Production Environment Config Files
         run: |

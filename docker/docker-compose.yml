@@ -6,7 +6,7 @@ services:
       - ./config:/config
       - ./scripts:/scripts:ro
     environment:
-      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_TOKEN=${GHCR_TOKEN}
       - CONFIG_REPO_URL=https://github.com/UruruLab/Ururu-AI-Config.git
       - ENVIRONMENT=${ENVIRONMENT:-production}
     command: /scripts/fetch-config.sh
@@ -22,7 +22,7 @@ services:
   ururu-ai:
     build:
       context: .
-      dockerfile: docker/Dockerfile
+      dockerfile: Dockerfile
       target: ${BUILD_TARGET:-production}
     container_name: ururu-ai-service
     ports:
