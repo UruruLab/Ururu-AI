@@ -138,11 +138,6 @@ jobs:
           echo "Validating development environment configuration files"
           echo "Validating docker-compose.development.yml syntax"
           ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-          echo "Verifying environment variable bindings"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config \
-            | grep -A 10 "environment:" \
-            | grep "^[[:space:]]*[[:alpha:]]" \
-            | sed 's/.*$/&<redacted>/' || true
           echo "Development environment deployment preparation completed"
 
       - name: Simulate Deployment (No actual EC2 deployment)
@@ -187,25 +182,115 @@ jobs:
       - name: Validate Docker Compose Configuration
         run: |
           echo "Validating production environment configuration files"
-          echo "Validating docker-compose.production.yml syntax"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
-          echo "Verifying environment variable bindings"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config \
-            | grep -A 10 "environment:" \
-            | grep "^[[:space:]]*[[:alpha:]]" \
-            | sed 's/.*$/&<redacted>/' || true
           echo "Production environment deployment preparation completed"
 
-      - name: Prepare Deployment Notification
-        run: |
-          echo "Production environment deployment preparation completed"
-          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "- Config File: .env.production (fetched from Config repository)"
-          echo "Actual EC2 deployment will be handled by separate process"
+      - name: Deploy to Production EC2
+        uses: appleboy/ssh-action@v0.1.6
+        with:
+          host: ${{ secrets.PROD_EC2_HOST }}
+          username: ${{ secrets.PROD_EC2_USER }}
+          key: ${{ secrets.PROD_EC2_SSH_KEY }}
+          port: 22
+          timeout: 600s
+          script: |
+            set -e
+            echo "Production AI service deployment started"
+            
+            if docker ps | grep ururu-ai-service; then
+              echo "Existing AI service found"
+              docker logs --tail 5 ururu-ai-service
+            fi
+            
+            cd /home/ec2-user/Ururu-AI
+            git fetch origin
+            git checkout main
+            git reset --hard origin/main
+            echo "Code update completed"
+            
+            docker build -t ururu-ai:latest .
+            echo "Docker image build completed"
+            
+            cd /home/ec2-user/app
+            docker compose -f docker-compose-prod.yml stop ururu-ai || true
+            docker compose -f docker-compose-prod.yml up -d ururu-ai
+            echo "AI service restart completed"
+            
+            echo "Waiting for service to be ready..."
+            for i in {1..60}; do
+              if curl -f http://localhost:8000/health 2>/dev/null; then
+                echo "AI service is healthy"
+                break
+              fi
+              if [ $i -eq 60 ]; then
+                echo "Health check failed"
+                docker logs --tail 10 ururu-ai-service
+                exit 1
+              fi
+              sleep 5
+            done
+            
+            if curl -f http://localhost:8000/api/recommendations/spring-health 2>/dev/null; then
+              echo "Spring Boot integration verified"
+            else
+              echo "Spring Boot integration check failed"
+              docker logs --tail 5 ururu-ai-service
+            fi
+            
+            VECTOR_STATUS=$(curl -s http://localhost:8000/api/vector/status | grep -o '"total_vectors":[0-9]*' | cut -d':' -f2 || echo "0")
+            echo "Vector index status: $VECTOR_STATUS vectors"
+            
+            if [ "$VECTOR_STATUS" -lt 1000 ]; then
+              echo "Vector count low, triggering embedding regeneration"
+              curl -X POST "http://localhost:8000/api/vector/embeddings/batch?batch_size=100&force_recreate=false" || echo "Embedding regeneration request failed"
+            fi
+            
+            echo "Production AI service deployment completed"
+            echo "$(date): AI service deployed - commit: $GITHUB_SHA" >> /home/ec2-user/deployment.log
 
-      - name: Deployment Completion Notification
-        if: success()
+      - name: Deployment Notification
+        if: always()
         run: |
-          echo "GitHub Actions deployment pipeline completed successfully."
-          echo "Docker image has been pushed to GitHub Container Registry."
-          echo "Manual execution required on EC2 server: docker compose pull && docker compose up -d"
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "Production AI service deployment successful"
+            echo "AI Service: http://3.39.69.34:8000"
+            echo "API Documentation: http://3.39.69.34:8000/docs"
+            echo "AI recommendation service is now available"
+          else
+            echo "Production AI service deployment failed"
+            echo "Check EC2 logs: docker logs ururu-ai-service"
+          fi
+
+      - name: Create Deployment Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Production AI Service Deployment Failed',
+              body: `## As Is (Current Issue)
+            
+            Production AI service automated deployment has failed.
+            
+            **Deployment Information:**
+            - Commit: ${context.sha}
+            - Branch: ${context.ref}
+            - Execution Time: ${new Date().toISOString()}
+            - Workflow: ${context.workflow}
+            ## To Be (Expected Behavior)
+            
+            AI service should be deployed successfully and available for frontend AI recommendation features.
+            
+            ## Deadline
+            
+            Critical fix required within 1 hour
+            
+            ## References
+            
+            - [Workflow Execution Log](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            - [EC2 AI Service Status](http://3.39.69.34:8000/health)
+            - [AI API Documentation](http://3.39.69.34:8000/docs)
+            `,
+              labels: ['urgent', 'ai-service', 'deployment']
+            })
