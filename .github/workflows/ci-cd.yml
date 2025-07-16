@@ -94,7 +94,7 @@ jobs:
           username: ${{ secrets.AI_EC2_USER }}
           key: ${{ secrets.AI_EC2_SSH_KEY }}
           port: 22
-          timeout: 600s
+          timeout: 1200s
           envs: GITHUB_SHA
           script: |
             set -e
@@ -140,7 +140,7 @@ jobs:
           username: ${{ secrets.AI_EC2_USER }}
           key: ${{ secrets.AI_EC2_SSH_KEY }}
           port: 22
-          timeout: 600s
+          timeout: 1200s
           envs: GITHUB_SHA
           script: |
             set -e
@@ -161,22 +161,43 @@ jobs:
             docker-compose -f docker-compose-ai-prod.yml down || true
             docker-compose -f docker-compose-ai-prod.yml up -d --build
             
-            echo "⏳ 서비스 시작 대기 중..."
-            sleep 30
+            echo "⏳ AI 모델 로딩 대기 중 (60초)..."
+            sleep 60
             
             # 헬스체크
             echo "🔍 헬스체크 시작"
-            for i in {1..60}; do
+            echo "📋 컨테이너 상태 확인"
+            docker ps | grep ururu-ai-service || echo "컨테이너를 찾을 수 없습니다"
+            
+            echo "📝 컨테이너 로그 확인"
+            docker logs --tail 10 ururu-ai-service || echo "로그를 가져올 수 없습니다"
+            
+            for i in {1..120}; do
+              echo "헬스체크 시도 $i/120"
+              
+              # 컨테이너가 실행 중인지 확인
+              if ! docker ps | grep ururu-ai-service > /dev/null; then
+                echo "❌ 컨테이너가 중지되었습니다"
+                docker logs --tail 20 ururu-ai-service
+                exit 1
+              fi
+              
+              # 헬스체크 시도
               if curl -f http://localhost:8000/health 2>/dev/null; then
                 echo "✅ FastAPI 서비스 헬스체크 통과"
                 break
               fi
-              if [ $i -eq 60 ]; then
-                echo "❌ 헬스체크 실패"
-                docker logs --tail 20 ururu-ai-service
+              
+              if [ $i -eq 120 ]; then
+                echo "❌ 헬스체크 실패 (20분 타임아웃)"
+                echo "📝 최종 컨테이너 로그:"
+                docker logs --tail 50 ururu-ai-service
+                echo "📊 컨테이너 상태:"
+                docker ps -a | grep ururu-ai-service
                 exit 1
               fi
-              sleep 5
+              
+              sleep 10
             done
             
             # 벡터 인덱스 상태 확인
