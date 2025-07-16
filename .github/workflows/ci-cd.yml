@@ -158,8 +158,11 @@ jobs:
               docker logs --tail 10 ururu-ai-service
             fi
             
-            # 코드 업데이트 (올바른 디렉토리)
+            # 작업 디렉토리 생성 및 이동
+            mkdir -p /home/ec2-user/ururu-ai
             cd /home/ec2-user/ururu-ai
+            
+            # 코드 업데이트 (올바른 디렉토리)
             if [ ! -d ".git" ]; then
               echo "📥 레포지토리 초기 클론"
               git clone https://github.com/UruruLab/Ururu-AI.git .
