@@ -2,66 +2,16 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, 'fix/*' ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop, 'fix/*' ]
+    branches: [ main ]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    
-    # 환경변수 설정
-    env:
-      ENVIRONMENT: development
-      DEBUG: true
-      LOG_LEVEL: INFO
-      GITHUB_ACTIONS: true
-      
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup Python Environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Cache Dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          # Install test tools first (including pytest-env)
-          pip install pytest==8.3.4 pytest-asyncio==0.25.0 pytest-env==1.1.5 flake8==7.1.1 black==25.1.0 isort==5.13.2
-          # Then install project dependencies
-          pip install -r requirements.txt
-
-      - name: Code Quality Check
-        run: |
-          # Check only critical syntax errors
-          flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          echo "Code quality check completed"
-
-      - name: Run Tests
-        run: |
-          export APP_NAME="Ururu AI Recommendation System"
-          export EMBEDDING_MODEL_NAME="sentence-transformers/all-MiniLM-L6-v2"
-          export EMBEDDING_DIMENSION="384"
-          python -m pytest tests/ -v --tb=short
-        continue-on-error: false
-
   build-and-push:
-    needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     
@@ -94,63 +44,14 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-development:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop'
-    environment: development
-    
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Checkout Config Repository
-        uses: actions/checkout@v4
-        with:
-          repository: UruruLab/Ururu-AI-Config
-          path: config
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
-
-      - name: Copy Development Environment Config Files
-        run: |
-          if compgen -G "config/.env*" > /dev/null; then
-            if [ -f "config/.env.development" ]; then
-              cp config/.env.development .env.development
-              echo "✅ Development environment config files copied successfully"
-            else
-              echo "❌ .env.development not found in config repository"
-              exit 1
-            fi
-          else
-            echo "❌ No config files found in config repository"
-            exit 1
-          fi
-
-      - name: Validate Docker Compose Configuration
-        run: |
-          echo "Validating development environment configuration files"
-          echo "Validating docker-compose.development.yml syntax"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config --quiet
-          echo "Verifying environment variable bindings"
-          ENVIRONMENT=development docker compose -f docker-compose.development.yml config \
-            | grep -A 10 "environment:" \
-            | grep "^[[:space:]]*[[:alpha:]]" \
-            | sed 's/.*$/&<redacted>/' || true
-          echo "Development environment deployment preparation completed"
-
-      - name: Simulate Deployment (No actual EC2 deployment)
-        run: |
-          echo "Development environment deployment simulation"
-          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop"
-          echo "- Config File: .env.development (fetched from Config repository)"
-          echo "Development environment deployment configuration completed"
+  # Development 배포는 VPC 내부 통신에서 불필요하므로 제거
 
   deploy-production:
     needs: build-and-push
@@ -167,7 +68,7 @@ jobs:
         with:
           repository: UruruLab/Ururu-AI-Config
           path: config
-          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          token: ${{ secrets.GHCR_TOKEN }}
 
       - name: Copy Production Environment Config Files
         run: |
@@ -183,29 +84,132 @@ jobs:
             echo "❌ No config files found in config repository"
             exit 1
           fi
-        
-      - name: Validate Docker Compose Configuration
-        run: |
-          echo "Validating production environment configuration files"
-          echo "Validating docker-compose.production.yml syntax"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config --quiet
-          echo "Verifying environment variable bindings"
-          ENVIRONMENT=production docker compose -f docker-compose.production.yml config \
-            | grep -A 10 "environment:" \
-            | grep "^[[:space:]]*[[:alpha:]]" \
-            | sed 's/.*$/&<redacted>/' || true
-          echo "Production environment deployment preparation completed"
 
-      - name: Prepare Deployment Notification
-        run: |
-          echo "Production environment deployment preparation completed"
-          echo "- Docker Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "- Config File: .env.production (fetched from Config repository)"
-          echo "Actual EC2 deployment will be handled by separate process"
+      - name: Deploy to FastAPI Production EC2
+        uses: appleboy/ssh-action@v0.1.6
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.AI_EC2_HOST }}
+          username: ${{ secrets.AI_EC2_USER }}
+          key: ${{ secrets.AI_EC2_SSH_KEY }}
+          port: 22
+          timeout: 600s
+          envs: GITHUB_SHA
+          script: |
+            set -e
+            echo "🚀 FastAPI AI 서비스 배포 시작"
+            
+            # 기존 컨테이너 상태 확인
+            if docker ps | grep ururu-ai-service; then
+              echo "📊 기존 AI 서비스 로그 확인"
+              docker logs --tail 10 ururu-ai-service
+            fi
+            
+            # 작업 디렉토리 생성 및 이동
+            mkdir -p /home/ec2-user/ururu-ai
+            cd /home/ec2-user/ururu-ai
+            
+            # 코드 업데이트 (올바른 디렉토리)
+            if [ ! -d ".git" ]; then
+              echo "📥 레포지토리 초기 클론"
+              git clone https://github.com/UruruLab/Ururu-AI.git .
+            else
+              echo "🔄 코드 업데이트"
+              git fetch origin
+              git checkout main
+              git reset --hard origin/main
+            fi
+            
+            # Config 파일 복사 (중복 생성 제거)
+            echo "📝 Config 파일 사용"
+            if [ ! -f ".env.production" ]; then
+              echo "❌ .env.production 파일이 없습니다. Config 리포지토리에서 가져와야 합니다."
+              exit 1
+            fi
+            
+            # Docker 컨테이너 배포
+            echo "🐳 Docker 컨테이너 배포"
+            cd docker/
+            docker compose -f docker-compose-ai-prod.yml down || true
+            docker compose -f docker-compose-ai-prod.yml up -d --build
+            
+            echo "⏳ 서비스 시작 대기 중..."
+            sleep 30
+            
+            # 헬스체크
+            echo "🔍 헬스체크 시작"
+            for i in {1..60}; do
+              if curl -f http://localhost:8000/health 2>/dev/null; then
+                echo "✅ FastAPI 서비스 헬스체크 통과"
+                break
+              fi
+              if [ $i -eq 60 ]; then
+                echo "❌ 헬스체크 실패"
+                docker logs --tail 20 ururu-ai-service
+                exit 1
+              fi
+              sleep 5
+            done
+            
+            # 벡터 인덱스 상태 확인
+            echo "📊 벡터 인덱스 상태 확인"
+            VECTOR_STATUS=$(curl -s http://localhost:8000/api/vector/status | grep -o '"total_vectors":[0-9]*' | cut -d':' -f2 || echo "0")
+            echo "벡터 인덱스 상태: $VECTOR_STATUS 개 벡터"
+            
+            # 임베딩 재생성 (필요시)
+            if [ "$VECTOR_STATUS" -lt 1000 ]; then
+              echo "🔄 벡터 인덱스 재생성 시작"
+              curl -X POST "http://localhost:8000/api/vector/embeddings/batch?batch_size=100&force_recreate=false" || echo "임베딩 재생성 요청 실패"
+            fi
+            
+            echo "🎉 FastAPI AI 서비스 배포 완료"
+            echo "$(date): FastAPI AI 서비스 배포 완료 - commit: $GITHUB_SHA" >> /home/ec2-user/deployment.log
 
-      - name: Deployment Completion Notification
-        if: success()
+      - name: Deployment Notification
+        if: always()
         run: |
-          echo "GitHub Actions deployment pipeline completed successfully."
-          echo "Docker image has been pushed to GitHub Container Registry."
-          echo "Manual execution required on EC2 server: docker compose pull && docker compose up -d"
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ FastAPI AI 서비스 배포 성공"
+            echo "🌐 AI 서비스: http://43.200.204.67:8000"
+            echo "📚 API 문서: http://43.200.204.67:8000/docs"
+            echo "🔗 Spring Boot 연동 준비 완료"
+          else
+            echo "❌ FastAPI AI 서비스 배포 실패"
+            echo "📝 로그 확인: docker logs ururu-ai-service"
+          fi
+
+      - name: Create Deployment Issue on Failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Production AI Service Deployment Failed',
+              body: `## As Is (Current Issue)
+            
+            Production AI service automated deployment has failed.
+            
+            **Deployment Information:**
+            - Commit: ${context.sha}
+            - Branch: ${context.ref}
+            - Execution Time: ${new Date().toISOString()}
+            - Workflow: ${context.workflow}
+            ## To Be (Expected Behavior)
+            
+            AI service should be deployed successfully and available for frontend AI recommendation features.
+            
+            ## Deadline
+            
+            Critical fix required within 1 hour
+            
+            ## References
+            
+            - [Workflow Execution Log](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            - [EC2 AI Service Status](http://3.39.69.34:8000/health)
+            - [AI API Documentation](http://3.39.69.34:8000/docs)
+            `,
+              labels: ['urgent', 'ai-service', 'deployment']
+            })

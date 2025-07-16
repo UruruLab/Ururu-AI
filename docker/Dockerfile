@@ -50,15 +50,6 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 # 애플리케이션 코드 복사
 COPY --chown=appuser:appgroup . .
 
-# 로그 디렉토리 생성 및 권한 설정
-RUN mkdir -p /app/logs && \
-    chown -R appuser:appgroup /app && \
-    chmod -R 755 /app/logs
-
-# 캐시 디렉토리 생성
-RUN mkdir -p /app/.cache && \
-    chown appuser:appgroup /app/.cache
-
 # 비root 사용자로 전환
 USER appuser
 

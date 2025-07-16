@@ -1,0 +1,42 @@
+services:
+  ururu-ai:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: ururu-ai-service
+    environment:
+      - ENVIRONMENT=production
+    env_file:
+      - ../.env.production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - ururu-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  ururu-network:
+    driver: bridge
+    name: ururu-network
