@@ -68,7 +68,7 @@ jobs:
       - name: Validate Docker Compose Configuration
         run: |
           echo "✅ Validating main Docker Compose file syntax"
-          cd docker && docker compose config --quiet
+          cd docker && docker compose -f docker-compose-ai.yml config --quiet
           echo "✅ Docker Compose validation completed"
         env:
           GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
