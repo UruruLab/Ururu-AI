@@ -120,12 +120,39 @@ jobs:
               git checkout main
               git reset --hard origin/main
             fi
+
+      - name: Copy Config to EC2
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.AI_EC2_HOST }}
+          username: ${{ secrets.AI_EC2_USER }}
+          key: ${{ secrets.AI_EC2_SSH_KEY }}
+          port: 22
+          source: ".env.production"
+          target: "/home/ec2-user/ururu-ai/"
+
+      - name: Continue Deployment
+        uses: appleboy/ssh-action@v0.1.6
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        with:
+          host: ${{ secrets.AI_EC2_HOST }}
+          username: ${{ secrets.AI_EC2_USER }}
+          key: ${{ secrets.AI_EC2_SSH_KEY }}
+          port: 22
+          timeout: 600s
+          envs: GITHUB_SHA
+          script: |
+            set -e
+            cd /home/ec2-user/ururu-ai
             
-            # Config 파일 복사 (중복 생성 제거)
-            echo "📝 Config 파일 사용"
+            # Config 파일 확인
+            echo "📝 Config 파일 확인"
             if [ ! -f ".env.production" ]; then
-              echo "❌ .env.production 파일이 없습니다. Config 리포지토리에서 가져와야 합니다."
+              echo "❌ .env.production 파일이 없습니다."
               exit 1
+            else
+              echo "✅ .env.production 파일 확인됨"
             fi
             
             # Docker 컨테이너 배포
@@ -177,39 +204,5 @@ jobs:
           else
             echo "❌ FastAPI AI 서비스 배포 실패"
             echo "📝 로그 확인: docker logs ururu-ai-service"
+            echo "🔧 문제 해결 후 다시 배포하세요"
           fi
-
-      - name: Create Deployment Issue on Failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: 'Production AI Service Deployment Failed',
-              body: `## As Is (Current Issue)
-            
-            Production AI service automated deployment has failed.
-            
-            **Deployment Information:**
-            - Commit: ${context.sha}
-            - Branch: ${context.ref}
-            - Execution Time: ${new Date().toISOString()}
-            - Workflow: ${context.workflow}
-            ## To Be (Expected Behavior)
-            
-            AI service should be deployed successfully and available for frontend AI recommendation features.
-            
-            ## Deadline
-            
-            Critical fix required within 1 hour
-            
-            ## References
-            
-            - [Workflow Execution Log](https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
-            - [EC2 AI Service Status](http://3.39.69.34:8000/health)
-            - [AI API Documentation](http://3.39.69.34:8000/docs)
-            `,
-              labels: ['urgent', 'ai-service', 'deployment']
-            })
