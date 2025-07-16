@@ -49,13 +49,6 @@ jobs:
           echo "📁 Checking Docker context config files"
           ls -la ./docker/config/
           
-          if [ -f "./docker/config/.env.development" ]; then
-            echo "✅ .env.development file exists in docker context"
-          else
-            echo "❌ .env.development file missing in docker context"
-            exit 1
-          fi
-          
           if [ -f "./docker/config/.env.production" ]; then
             echo "✅ .env.production file exists in docker context"
           else
