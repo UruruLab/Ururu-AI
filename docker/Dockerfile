@@ -50,8 +50,18 @@ RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 # 애플리케이션 코드 복사
 COPY --chown=appuser:appgroup . .
 
+# 필요한 디렉토리 생성 및 권한 설정
+RUN mkdir -p /app/logs /app/data /app/.cache /home/appuser/.cache && \
+    chown -R appuser:appgroup /app /home/appuser && \
+    chmod -R 755 /app/logs /app/data /app/.cache /home/appuser
+
 # 비root 사용자로 전환
 USER appuser
+
+# Hugging Face 캐시 디렉토리 환경변수 설정
+ENV HF_HOME=/app/.cache
+ENV TRANSFORMERS_CACHE=/app/.cache
+ENV HF_DATASETS_CACHE=/app/.cache
 
 # 헬스체크 추가
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
