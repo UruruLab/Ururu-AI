@@ -87,6 +87,8 @@ jobs:
 
       - name: Deploy to FastAPI Production EC2
         uses: appleboy/ssh-action@v0.1.6
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         with:
           host: ${{ secrets.AI_EC2_HOST }}
           username: ${{ secrets.AI_EC2_USER }}
