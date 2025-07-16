@@ -1,17 +1,19 @@
 services:
   ururu-ai:
     build:
+      context: ..
+      dockerfile: docker/Dockerfile
       target: production
+    container_name: ururu-ai-service
     environment:
       - ENVIRONMENT=production
-      - SPRING_BOOT_INTEGRATION_ENABLED=true  # 운영환경에서는 Spring Boot 연동 필수
-      - USE_MOCK_DATA=false  # 실제 데이터 사용
     env_file:
-      - ./.env.production
+      - ../.env.production
     ports:
-      - "${AI_PORT:-8000}:8000"  # Spring Boot 서버에서 접근 가능
-    networks:
-      - ururu-network
+      - "8000:8000"
+    volumes:
+      - ../logs:/app/logs
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -19,29 +21,20 @@ services:
       retries: 3
       start_period: 40s
     deploy:
-      replicas: 2
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
           cpus: '1.0'
-          memory: 1G
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-
-  # 운영용 로그 수집 (Fluent Bit)
-  fluent-bit:
-    image: fluent/fluent-bit:latest
-    container_name: ururu-ai-logs
-    volumes:
-      - ./logs:/var/log/app:ro
-      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+          memory: 1.5G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
     networks:
       - ururu-network
-    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   ururu-network:

@@ -170,20 +170,18 @@ jobs:
               git reset --hard origin/main
             fi
             
-            # 환경변수 설정
-            echo "📝 환경변수 설정"
-            cat > .env.production << EOF
-            ENVIRONMENT=production
-            AI_PORT=8000
-            SPRING_BOOT_BASE_URL=http://${{ secrets.SPRING_BOOT_PRIVATE_IP }}:8080
-            BUILD_TARGET=production
-            EOF
+            # Config 파일 복사 (중복 생성 제거)
+            echo "📝 Config 파일 사용"
+            if [ ! -f ".env.production" ]; then
+              echo "❌ .env.production 파일이 없습니다. Config 리포지토리에서 가져와야 합니다."
+              exit 1
+            fi
             
             # Docker 컨테이너 배포
             echo "🐳 Docker 컨테이너 배포"
-            cd docker
-            docker compose down || true
-            docker compose up -d --build
+            cd docker/
+            docker compose -f docker-compose-ai-prod.yml down || true
+            docker compose -f docker-compose-ai-prod.yml up -d --build
             
             echo "⏳ 서비스 시작 대기 중..."
             sleep 30
