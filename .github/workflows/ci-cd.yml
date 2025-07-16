@@ -158,8 +158,8 @@ jobs:
             # Docker 컨테이너 배포
             echo "🐳 Docker 컨테이너 배포"
             cd docker/
-            docker compose -f docker-compose-ai-prod.yml down || true
-            docker compose -f docker-compose-ai-prod.yml up -d --build
+            docker-compose -f docker-compose-ai-prod.yml down || true
+            docker-compose -f docker-compose-ai-prod.yml up -d --build
             
             echo "⏳ 서비스 시작 대기 중..."
             sleep 30
