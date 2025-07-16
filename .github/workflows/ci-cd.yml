@@ -16,8 +16,8 @@ jobs:
     
     # 환경변수 설정
     env:
-      ENVIRONMENT: development
-      DEBUG: true
+      ENVIRONMENT: production
+      DEBUG: false
       LOG_LEVEL: INFO
       GITHUB_ACTIONS: true
       
